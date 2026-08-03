@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
+from ..config import Segment
 from ..config import load as load_settings
 from ..db import store
-from ..db.models import Job, new_id
+from ..db.models import Job, Source, new_id
 from ..jobs.events import broker
 from ..jobs.queue import queue
 from .schemas import JobCreateIn, JobOut, JobSettingsIn
@@ -42,8 +45,56 @@ def _apply_overrides(settings, overrides: JobSettingsIn):
         merged.export.caption_style = overrides.caption_style
     if overrides.ratio:
         merged.export.ratio = overrides.ratio
+    if overrides.selection_mode:
+        merged.selection.mode = overrides.selection_mode
+    if overrides.segments is not None:
+        merged.selection.segments = [
+            Segment(start_s=s.start_s, end_s=s.end_s, title=s.title) for s in overrides.segments
+        ]
+    if overrides.output_dir is not None:
+        merged.export.output_dir = overrides.output_dir
 
     return merged
+
+
+def _validate_manual_selection(settings, source: Source) -> None:
+    """Raise a plain-English 400 for anything wrong with a manual cut list.
+
+    Checked here rather than in the runner: a bad section list is a mistake the
+    user just made and can fix immediately, not a pipeline failure to retry
+    after minutes of transcription work.
+    """
+    if settings.selection.mode != "manual":
+        return
+
+    segments = settings.selection.segments
+    if not segments:
+        raise HTTPException(status_code=400, detail="Add at least one section to cut.")
+
+    for segment in segments:
+        if segment.end_s <= segment.start_s:
+            raise HTTPException(
+                status_code=400, detail="A section's end must come after its start."
+            )
+        if source.duration_s and segment.end_s > source.duration_s:
+            raise HTTPException(status_code=400, detail="A section runs past the end of the video.")
+
+    ordered = sorted(segments, key=lambda s: s.start_s)
+    for previous, current in zip(ordered, ordered[1:], strict=False):
+        if current.start_s < previous.end_s:
+            raise HTTPException(status_code=400, detail="Two sections overlap.")
+
+
+def _validate_output_dir(settings) -> None:
+    output_dir = settings.export.output_dir
+    if not output_dir:
+        return
+
+    path = Path(output_dir)
+    if not path.is_dir() or not os.access(path, os.W_OK):
+        raise HTTPException(
+            status_code=400, detail="That folder doesn't exist or can't be written to."
+        )
 
 
 @router.post("", response_model=JobOut, status_code=201)
@@ -57,6 +108,8 @@ async def create_job(payload: JobCreateIn) -> JobOut:
         raise HTTPException(
             status_code=400, detail="Minimum clip length must be below the maximum."
         )
+    _validate_manual_selection(settings, source)
+    _validate_output_dir(settings)
 
     job = Job(
         id=new_id(),

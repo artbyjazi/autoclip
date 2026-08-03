@@ -9,7 +9,6 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from .. import paths
 from ..config import load as load_settings
 from ..db import store
 from ..db.models import Export, new_id
@@ -196,10 +195,15 @@ async def export_clip(clip_id: str, payload: ExportRequestIn) -> ExportOut:
     workspace = JobWorkspace(clip.job_id)
     crop_path = await asyncio.to_thread(_crop_path_for, workspace, clip, source, payload.ratio)
 
-    destination = (
-        paths.exports_dir()
-        / clip.job_id
-        / export_module.output_filename(clip.title or f"clip-{clip.rank}", payload.ratio)
+    try:
+        destination_dir = await asyncio.to_thread(
+            export_module.resolve_output_dir, settings.export, clip.job_id
+        )
+    except export_module.ExportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    destination = destination_dir / export_module.output_filename(
+        clip.title or f"clip-{clip.rank}", payload.ratio
     )
 
     request = export_module.ExportRequest(

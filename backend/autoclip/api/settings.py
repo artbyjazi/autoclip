@@ -4,17 +4,33 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from .. import config, models, system
+from .. import config, models, paths, system
 from ..providers import PROVIDERS, build_provider
 from ..providers.base import ProviderStatus
-from .schemas import ProviderStatusOut, SecretIn, SettingsIn, SettingsOut, SystemOut
+from .schemas import (
+    FolderEntryOut,
+    FolderListingOut,
+    FolderSuggestionOut,
+    ProviderStatusOut,
+    SecretIn,
+    SettingsIn,
+    SettingsOut,
+    SystemOut,
+)
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["settings"])
+
+#: Cap on how many subdirectories one listing returns. A media-heavy folder can
+#: have thousands of siblings; the folder picker is for navigating toward a
+#: destination, not rendering the whole filesystem in one response.
+MAX_FOLDER_ENTRIES = 500
 
 
 def _settings_out(settings: config.Settings) -> SettingsOut:
@@ -156,3 +172,78 @@ async def fetch_models() -> None:
                 await asyncio.to_thread(models.ensure, key)
             except models.ModelDownloadError as exc:
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+def _folder_suggestions() -> list[FolderSuggestionOut]:
+    """Well-known folders, filtered to ones that actually exist on this machine."""
+    home = Path.home()
+    candidates = [
+        ("Videos", home / "Videos"),
+        ("Desktop", home / "Desktop"),
+        ("Downloads", home / "Downloads"),
+        ("Documents", home / "Documents"),
+        ("Default save location", paths.exports_dir()),
+    ]
+    return [
+        FolderSuggestionOut(label=label, path=str(candidate))
+        for label, candidate in candidates
+        if candidate.is_dir()
+    ]
+
+
+@router.get("/settings/folders", response_model=FolderListingOut)
+async def browse_folders(path: str | None = None) -> FolderListingOut:
+    """List subdirectories of `path`, for the save-location picker.
+
+    Browsers can't hand a web page a server-side directory picker, and this
+    server runs on the user's own machine, so the picker is implemented here
+    instead: walk the real filesystem, directories only.
+    """
+    target = Path(path).expanduser() if path else Path.home()
+
+    try:
+        target = await asyncio.to_thread(target.resolve)
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=400, detail="That location doesn't exist or can't be opened."
+        ) from exc
+
+    if not target.is_dir():
+        raise HTTPException(
+            status_code=400, detail="That location doesn't exist or can't be opened."
+        )
+
+    def _list_children() -> list[Path]:
+        return sorted(target.iterdir(), key=lambda p: p.name.lower())
+
+    try:
+        children = await asyncio.to_thread(_list_children)
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403, detail="AutoClip doesn't have permission to open that folder."
+        ) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=400, detail="That location doesn't exist or can't be opened."
+        ) from exc
+
+    entries: list[FolderEntryOut] = []
+    for child in children:
+        if len(entries) >= MAX_FOLDER_ENTRIES:
+            break
+        try:
+            if child.is_dir():
+                entries.append(FolderEntryOut(name=child.name, path=str(child)))
+        except PermissionError:
+            # A single unreadable child (a locked system folder, a broken
+            # symlink) shouldn't take down the whole listing.
+            continue
+
+    parent = target.parent
+    return FolderListingOut(
+        path=str(target),
+        parent=str(parent) if parent != target else None,
+        writable=os.access(target, os.W_OK),
+        entries=entries,
+        suggestions=_folder_suggestions(),
+    )

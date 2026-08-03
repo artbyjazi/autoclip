@@ -19,6 +19,7 @@ uv.lock
 node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 *.local
 
 # Built frontend, emitted into the Python package by `npm run build`.

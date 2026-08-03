@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/usejobstream.ts","./src/components/captioneditor.tsx","./src/components/clipplayer.tsx","./src/components/errornote.tsx","./src/components/trimbar.tsx","./src/pages/ingest.tsx","./src/pages/jobprogress.tsx","./src/pages/review.tsx","./src/pages/settings.tsx","./vite.config.ts"],"version":"5.9.3"}

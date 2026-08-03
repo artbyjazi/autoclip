@@ -8,10 +8,12 @@ export URLs) that don't belong in storage.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from .. import paths
 from ..db import models
 
 
@@ -70,6 +72,14 @@ class UrlIngestIn(BaseModel):
 YouTubeIngestIn = UrlIngestIn
 
 
+class SegmentIn(BaseModel):
+    """One user-picked section, for manual clip selection."""
+
+    start_s: float = Field(ge=0)
+    end_s: float = Field(gt=0)
+    title: str = ""
+
+
 class JobSettingsIn(BaseModel):
     """Per-job overrides. Anything omitted falls back to saved settings."""
 
@@ -82,6 +92,9 @@ class JobSettingsIn(BaseModel):
     max_clips: int | None = Field(default=None, ge=1, le=50)
     caption_style: str | None = None
     ratio: Literal["9:16", "1:1", "16:9"] | None = None
+    selection_mode: Literal["auto", "manual"] | None = None
+    segments: list[SegmentIn] | None = None
+    output_dir: str | None = None
 
 
 class JobCreateIn(BaseModel):
@@ -102,9 +115,20 @@ class JobOut(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     source: SourceOut | None = None
+    #: "auto" (AI picked highlights) or "manual" (user-specified sections), so
+    #: the progress checklist can label the selection stage correctly.
+    selection_mode: str = "auto"
+    #: Resolved folder the clips were (or will be) written to. Derived here,
+    #: rather than in the frontend from a download URL, since the settings
+    #: dict already carries the real answer.
+    output_dir: str = ""
 
     @classmethod
     def of(cls, job: models.Job, source: models.Source | None = None) -> JobOut:
+        selection = job.settings.get("selection") or {}
+        export = job.settings.get("export") or {}
+        base_dir = export.get("output_dir") or ""
+        output_dir = str(Path(base_dir) / job.id) if base_dir else str(paths.exports_dir() / job.id)
         return cls(
             id=job.id,
             source_id=job.source_id,
@@ -118,6 +142,8 @@ class JobOut(BaseModel):
             started_at=job.started_at,
             finished_at=job.finished_at,
             source=SourceOut.of(source) if source else None,
+            selection_mode=selection.get("mode") or "auto",
+            output_dir=output_dir,
         )
 
 
@@ -274,3 +300,21 @@ class SystemOut(BaseModel):
     gpu_name: str | None
     compute_type: str
     diarization_available: bool
+
+
+class FolderEntryOut(BaseModel):
+    name: str
+    path: str
+
+
+class FolderSuggestionOut(BaseModel):
+    label: str
+    path: str
+
+
+class FolderListingOut(BaseModel):
+    path: str
+    parent: str | None
+    writable: bool
+    entries: list[FolderEntryOut]
+    suggestions: list[FolderSuggestionOut] = Field(default_factory=list)
