@@ -14,7 +14,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-SourceType = Literal["youtube", "upload"]
+#: "url" is the catch-all for the several hundred sites yt-dlp supports;
+#: YouTube and Twitch get their own labels because the UI and the error hints
+#: distinguish them.
+SourceType = Literal["youtube", "twitch", "url", "upload"]
 JobStatus = Literal["queued", "running", "failed", "done", "cancelled"]
 ClipStatus = Literal["candidate", "kept", "discarded", "exported"]
 

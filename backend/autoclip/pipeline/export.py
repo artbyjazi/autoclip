@@ -9,11 +9,13 @@ tight single to sit in one clip without a mid-stream frame-size change.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from .. import paths
 from ..config import ExportSettings
 from ..system import report
 from . import captions as captions_module
@@ -77,6 +79,32 @@ def slugify_title(title: str, *, max_length: int = 50) -> str:
 
 def output_filename(title: str, ratio: str) -> str:
     return f"{slugify_title(title)}_{ratio.replace(':', 'x')}.mp4"
+
+
+def resolve_output_dir(settings: ExportSettings, job_id: str) -> Path:
+    """Return the directory a job's clips should be written into, creating it.
+
+    Shared by the runner's export stage and the one-off re-export endpoint, so
+    a re-export always lands next to the rest of that job's clips rather than
+    in whichever directory happened to be configured at the time.
+    """
+    base = Path(settings.output_dir) if settings.output_dir else paths.exports_dir()
+    destination = base / job_id
+    try:
+        destination.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ExportError(
+            f"Clips can't be saved to {base} — that folder doesn't exist or "
+            "can't be written to. Choose a different save location in Settings."
+        ) from exc
+
+    if not os.access(destination, os.W_OK):
+        raise ExportError(
+            f"Clips can't be saved to {base} — that folder doesn't exist or "
+            "can't be written to. Choose a different save location in Settings."
+        )
+
+    return destination
 
 
 # --------------------------------------------------------------------------

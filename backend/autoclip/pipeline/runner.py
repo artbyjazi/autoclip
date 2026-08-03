@@ -280,6 +280,13 @@ class PipelineRunner:
             self._finish_stage(stage)
             return existing
 
+        if self.settings.selection.mode == "manual" and self.settings.selection.segments:
+            self._emit(stage, 0.0, "Cutting your sections")
+            clips = self._build_manual_clips(transcript)
+            store.replace_clips(self.job.id, clips)
+            self._finish_stage(stage)
+            return clips
+
         provider_name = self.job.provider or self.settings.active_provider
         provider = build_provider(provider_name, self.settings)
         config = detection_config(self.settings)
@@ -296,6 +303,44 @@ class PipelineRunner:
 
         store.replace_clips(self.job.id, clips)
         self._finish_stage(stage)
+        return clips
+
+    def _build_manual_clips(self, transcript: Transcript) -> list[Clip]:
+        """Turn user-picked sections directly into `Clip` rows.
+
+        No provider call and no API key needed — this is the whole point of
+        manual mode, so it must work even with no AI service configured at all.
+        """
+        duration = self.source.duration_s
+        clips: list[Clip] = []
+
+        for segment in sorted(self.settings.selection.segments, key=lambda s: s.start_s):
+            start_s = max(0.0, min(segment.start_s, duration))
+            end_s = max(0.0, min(segment.end_s, duration))
+            if end_s <= start_s:
+                continue
+
+            first, last = transcript.indices_in_range(start_s, end_s)
+            end_word = max(first, last - 1)
+
+            clips.append(
+                Clip(
+                    id=new_id(),
+                    job_id=self.job.id,
+                    start_s=start_s,
+                    end_s=end_s,
+                    start_word=first,
+                    end_word=end_word,
+                    title=segment.title or f"Clip {len(clips) + 1}",
+                    hook="",
+                    score=100,
+                    reason="Chosen by you",
+                )
+            )
+
+        for rank, clip in enumerate(clips, start=1):
+            clip.rank = rank
+
         return clips
 
     def _stage_reframe(self, clips: list[Clip], transcript: Transcript) -> dict[str, CropPath]:
@@ -359,8 +404,7 @@ class PipelineRunner:
         style = captions.get_style(self.settings.export.caption_style)
         ratio = self.settings.export.ratio
         source_path = Path(self.source.path)
-        destination_dir = paths.exports_dir() / self.job.id
-        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination_dir = export.resolve_output_dir(self.settings.export, self.job.id)
 
         for index, clip in enumerate(clips):
             self._check_cancelled()

@@ -36,6 +36,8 @@ export interface Job {
   started_at: string | null
   finished_at: string | null
   source: Source | null
+  selection_mode: string
+  output_dir: string
 }
 
 export interface ExportRecord {
@@ -146,9 +148,37 @@ export interface Settings {
     prefer_hardware_encoder: boolean
     crf: number
     write_srt: boolean
+    //: Where finished clips land. Empty string means the built-in default.
+    output_dir: string
   }
   insecure_secret_storage: boolean
   keys_present: Record<string, boolean>
+}
+
+/** One user-picked section, for manual clip selection. Mirrors config.Segment. */
+export interface Segment {
+  start_s: number
+  end_s: number
+  title: string
+}
+
+export interface FolderEntry {
+  name: string
+  path: string
+}
+
+export interface FolderSuggestion {
+  label: string
+  path: string
+}
+
+/** Mirrors FolderListingOut, the response behind the save-location picker. */
+export interface FolderListing {
+  path: string
+  parent: string | null
+  writable: boolean
+  entries: FolderEntry[]
+  suggestions: FolderSuggestion[]
 }
 
 export interface SystemStatus {
@@ -174,6 +204,9 @@ export interface JobSettingsOverrides {
   max_clips?: number
   caption_style?: string
   ratio?: string
+  selection_mode?: 'auto' | 'manual'
+  segments?: Segment[]
+  output_dir?: string
 }
 
 /** An API error carrying the server's message and its actionable hint. */
@@ -229,10 +262,20 @@ export const api = {
 
   listSources: () => request<Source[]>('/api/sources'),
 
-  ingestYouTube: (url: string, cookiesFromBrowser?: string) =>
-    request<Source>('/api/sources/youtube', {
+  /** POST /api/sources/url. `startS`/`endS` are the download range for the
+   * "only use part of the video" option, not the clip's own trim. */
+  ingestUrl: (
+    url: string,
+    opts: { cookiesFromBrowser?: string; startS?: number; endS?: number } = {},
+  ) =>
+    request<Source>('/api/sources/url', {
       method: 'POST',
-      body: JSON.stringify({ url, cookies_from_browser: cookiesFromBrowser || null }),
+      body: JSON.stringify({
+        url,
+        cookies_from_browser: opts.cookiesFromBrowser || null,
+        start_s: opts.startS ?? null,
+        end_s: opts.endS ?? null,
+      }),
     }),
 
   uploadSource: (file: File) => {
@@ -296,6 +339,9 @@ export const api = {
     request<void>(`/api/settings/secrets/${key}`, { method: 'DELETE' }),
 
   mediaUrl: (jobId: string) => `/api/jobs/${jobId}/media`,
+
+  browseFolders: (path?: string) =>
+    request<FolderListing>(`/api/settings/folders${path ? `?path=${encodeURIComponent(path)}` : ''}`),
 }
 
 /** Format seconds as m:ss, or h:mm:ss past an hour. */

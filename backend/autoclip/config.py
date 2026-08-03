@@ -71,14 +71,35 @@ class ClipSettings(BaseModel):
     max_clips: int = 10
 
 
+class Segment(BaseModel):
+    """One user-picked section of the source video, in manual selection mode."""
+
+    start_s: float = Field(ge=0)
+    end_s: float = Field(gt=0)
+    title: str = ""
+
+
+class SelectionSettings(BaseModel):
+    """How clips are chosen. Per-job, not a meaningful default to persist —
+    it rides along in `job.settings_json` because it lives on `Settings`, which
+    is what lets the runner read it through the same path as everything else."""
+
+    #: "auto" = LLM picks highlights. "manual" = use `segments` verbatim.
+    mode: Literal["auto", "manual"] = "auto"
+    segments: list[Segment] = Field(default_factory=list)
+
+
 class IngestSettings(BaseModel):
     #: yt-dlp format selector. Default caps at 1080p to keep downloads sane.
     ytdlp_format: str = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]"
-    #: Browser to pull YouTube cookies from ("chrome", "firefox", "edge", ...).
+    #: Browser to pull site cookies from ("chrome", "firefox", "edge", ...).
     #: As of 2026 most anonymous YouTube downloads hit a bot check that only
-    #: browser cookies reliably clear, so this is a first-class setting.
+    #: browser cookies reliably clear, and Twitch sub-only VODs need the cookies
+    #: of a subscribed account — so this is a first-class setting.
     cookies_from_browser: str = ""
     #: Offer YouTube's own auto-captions as a fast path, skipping Whisper.
+    #: YouTube-only, and skipped when a time range is requested, since the
+    #: caption track covers the whole video and yt-dlp won't trim it.
     prefer_youtube_captions: bool = False
 
 
@@ -92,6 +113,11 @@ class ExportSettings(BaseModel):
     crf: int = 18
     #: Also write a .srt sidecar next to each exported clip.
     write_srt: bool = False
+    #: Where finished clips are written. Empty = <root>/exports. Set from the
+    #: Make tab's folder picker; resolved through
+    #: `pipeline.export.resolve_output_dir` so a one-off re-export from the
+    #: clip review page lands in the same place as the job's own run.
+    output_dir: str = ""
 
 
 class Settings(BaseModel):
@@ -110,6 +136,7 @@ class Settings(BaseModel):
     clips: ClipSettings = Field(default_factory=ClipSettings)
     ingest: IngestSettings = Field(default_factory=IngestSettings)
     export: ExportSettings = Field(default_factory=ExportSettings)
+    selection: SelectionSettings = Field(default_factory=SelectionSettings)
 
     #: Set when secrets had to be written to config.json because no keyring
     #: backend was usable. Surfaced as a warning in the UI and in `doctor`.

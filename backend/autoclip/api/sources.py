@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import shutil
 import tempfile
@@ -13,7 +14,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from ..config import load as load_settings
 from ..db import store
 from ..pipeline import ingest
-from .schemas import SourceOut, YouTubeIngestIn
+from .schemas import SourceOut, UrlIngestIn
 
 log = logging.getLogger(__name__)
 
@@ -38,11 +39,19 @@ async def get_source(source_id: str) -> SourceOut:
     return SourceOut.of(source)
 
 
-@router.post("/youtube", response_model=SourceOut, status_code=201)
-async def ingest_youtube(payload: YouTubeIngestIn) -> SourceOut:
-    """Download a YouTube video and register it as a source."""
-    if not ingest.is_youtube_url(payload.url):
-        raise HTTPException(status_code=400, detail="That is not a YouTube URL.")
+@router.post("/url", response_model=SourceOut, status_code=201)
+async def ingest_url(payload: UrlIngestIn) -> SourceOut:
+    """Download a video from any site yt-dlp supports and register it as a source.
+
+    YouTube, Twitch VODs and clips, and several hundred others. Validation here
+    is only "is this an http URL" — deciding whether a given site is supported
+    is yt-dlp's job, and it reports that far more accurately than a host
+    allowlist we would have to maintain.
+    """
+    if not ingest.is_remote_url(payload.url):
+        raise HTTPException(
+            status_code=400, detail="That is not an http(s) URL AutoClip can fetch."
+        )
 
     settings = load_settings().ingest
     if payload.cookies_from_browser is not None:
@@ -51,7 +60,15 @@ async def ingest_youtube(payload: YouTubeIngestIn) -> SourceOut:
         )
 
     try:
-        source = await asyncio.to_thread(ingest.ingest_youtube, payload.url, settings)
+        source = await asyncio.to_thread(
+            functools.partial(
+                ingest.ingest_url,
+                payload.url,
+                settings,
+                start_s=payload.start_s,
+                end_s=payload.end_s,
+            )
+        )
     except ingest.IngestError as exc:
         # 422 rather than 500: the request was well-formed, but the content
         # can't be fetched, and the hint tells the user what to change.
@@ -61,6 +78,17 @@ async def ingest_youtube(payload: YouTubeIngestIn) -> SourceOut:
 
     await asyncio.to_thread(store.create_source, source)
     return SourceOut.of(source)
+
+
+@router.post("/youtube", response_model=SourceOut, status_code=201, deprecated=True)
+async def ingest_youtube(payload: UrlIngestIn) -> SourceOut:
+    """Deprecated alias for ``POST /api/sources/url``.
+
+    Kept so anything scripted against the YouTube-only API keeps working. It no
+    longer rejects non-YouTube links — narrowing the alias would break nothing
+    but help no one.
+    """
+    return await ingest_url(payload)
 
 
 @router.post("/upload", response_model=SourceOut, status_code=201)

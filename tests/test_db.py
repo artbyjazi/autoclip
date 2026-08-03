@@ -39,6 +39,67 @@ def test_foreign_keys_are_enforced(initialised_db: int) -> None:
         store.create_job(job)
 
 
+class TestMigrationV2:
+    """v2 rebuilds `sources` to widen its type CHECK. Table swaps are the one
+    migration shape that can silently destroy data, so the upgrade path is
+    tested against a populated v1 database rather than only a fresh one."""
+
+    def _v1_database(self) -> sqlite3.Connection:
+        from autoclip.db import schema
+
+        conn = db.connect()
+        with conn:
+            schema._migration_v1(conn)
+            conn.execute("PRAGMA user_version = 1")
+        return conn
+
+    def test_existing_rows_survive_the_rebuild(self) -> None:
+        conn = self._v1_database()
+        with conn:
+            conn.execute(
+                "INSERT INTO sources (id, type, url, path, title, duration_s, created_at) "
+                "VALUES ('s1', 'youtube', 'https://youtu.be/a', '/m/a.mp4', 'Old', 60, 'now')"
+            )
+            conn.execute(
+                "INSERT INTO jobs (id, source_id, status, created_at, updated_at) "
+                "VALUES ('j1', 's1', 'done', 'now', 'now')"
+            )
+
+        assert db.migrate(conn) == db.SCHEMA_VERSION
+
+        source = conn.execute("SELECT * FROM sources WHERE id = 's1'").fetchone()
+        assert source["title"] == "Old"
+        assert source["url"] == "https://youtu.be/a"
+        # The DROP must not cascade into jobs — that is what the foreign-key
+        # pragma toggle inside the migration is there to prevent.
+        assert conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 1
+
+    def test_twitch_is_accepted_after_upgrading(self) -> None:
+        conn = self._v1_database()
+        db.migrate(conn)
+
+        with conn:
+            conn.execute(
+                "INSERT INTO sources (id, type, path, created_at) "
+                "VALUES ('s2', 'twitch', '/m/b.mp4', 'now')"
+            )
+
+        assert conn.execute("SELECT type FROM sources WHERE id = 's2'").fetchone()[0] == "twitch"
+
+    def test_the_constraint_still_rejects_nonsense(self, initialised_db: int) -> None:
+        with pytest.raises(sqlite3.IntegrityError), db.connection() as conn:
+            conn.execute(
+                "INSERT INTO sources (id, type, path, created_at) "
+                "VALUES ('s3', 'vimeo', '/m/c.mp4', 'now')"
+            )
+
+    @pytest.mark.parametrize("source_type", ["youtube", "twitch", "url", "upload"])
+    def test_every_source_type_round_trips(self, initialised_db: int, source_type: str) -> None:
+        created = store.create_source(_make_source(type=source_type))
+
+        assert store.get_source(created.id).type == source_type
+
+
 def test_newer_schema_version_is_refused(initialised_db: int) -> None:
     with db.connection() as conn:
         conn.execute(f"PRAGMA user_version = {db.SCHEMA_VERSION + 5}")

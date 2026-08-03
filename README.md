@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11 | 3.12](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 
-Paste a YouTube link or drop a file. AutoClip transcribes it, uses an LLM to find the moments worth clipping, reframes them to vertical while tracking whoever is speaking, burns in animated captions, and exports platform-ready MP4s.
+Paste a link — YouTube, Twitch, or anything else yt-dlp supports — or drop a file. AutoClip transcribes it, uses an LLM to find the moments worth clipping, reframes them to vertical while tracking whoever is speaking, burns in animated captions, and exports platform-ready MP4s.
 
 No accounts. No uploads to anyone's servers. No watermarks. No subscription.
 
@@ -171,6 +171,12 @@ Everything here is a real failure hit during development, not hypothetical.
 **Captions don't appear in exports, or ffmpeg says "No such filter: ass".** Your ffmpeg has no libass. `doctor` reports this and prints the right command for your platform. On macOS that means `brew install ffmpeg-full`, not `brew install ffmpeg`; on Windows the full Gyan build, not "essentials".
 
 **YouTube downloads fail with a bot check.** As of 2026, YouTube blocks most anonymous downloads and proof-of-origin tokens no longer clear it. Set **Settings → Ingest → cookies from browser** to a browser you're signed into, and **close that browser** first — it locks its cookie database while running. Uploading a file always works and needs none of this.
+
+**A Twitch VOD says it's subscriber-only.** Same fix as the bot check: point **cookies from browser** at a browser signed in with an account that subscribes to the channel, and close it. Twitch clip links (`clips.twitch.tv/…`) are public and need none of this.
+
+**A Twitch link fails with "that channel is live".** AutoClip clips finished video, not a running stream. Wait for the stream to end and use the VOD link under the channel's Videos tab.
+
+**A four-hour VOD takes forever.** It would — transcription scales with length. Give the ingest request a `start_s`/`end_s` range and only that section is downloaded and transcribed. Pasting a Twitch or YouTube link that already carries a `?t=` timestamp seeds the start for you.
 
 **Exports are slower than expected.** Check `doctor` for GPU encoding. A build can list `h264_nvenc` and still be unusable if your driver is older than the NVENC API it was compiled against; AutoClip probes this and falls back to CPU encoding, which is identical quality and just slower.
 

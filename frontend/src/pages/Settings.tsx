@@ -67,7 +67,7 @@ export function Settings() {
         </p>
       )}
 
-      <Section title="AI provider" note="Which model picks the clips.">
+      <Section title="AI service" note="Which model picks the clips, when you let AI find the best moments.">
         <div className="space-y-1">
           {providers.map((provider) => (
             <button
