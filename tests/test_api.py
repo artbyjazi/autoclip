@@ -166,8 +166,31 @@ class TestSources:
     def test_missing_source_is_404(self, client: TestClient) -> None:
         assert client.get("/api/sources/nope").status_code == 404
 
-    def test_non_youtube_url_is_rejected(self, client: TestClient) -> None:
-        response = client.post("/api/sources/youtube", json={"url": "https://vimeo.com/12345"})
+    def test_non_url_input_is_rejected(self, client: TestClient) -> None:
+        response = client.post("/api/sources/url", json={"url": "C:/videos/clip.mp4"})
+
+        assert response.status_code == 400
+
+    def test_backwards_range_is_rejected_before_any_download(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/sources/url",
+            json={"url": "https://twitch.tv/videos/1", "start_s": 600, "end_s": 60},
+        )
+
+        assert response.status_code == 422
+        assert "after start" in response.json()["detail"]["message"]
+
+    def test_negative_start_fails_schema_validation(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/sources/url", json={"url": "https://twitch.tv/videos/1", "start_s": -5}
+        )
+
+        assert response.status_code == 422
+
+    def test_deprecated_youtube_route_still_answers(self, client: TestClient) -> None:
+        # Scripts written against the YouTube-only API must keep working; the
+        # alias reaches the same handler, so the same 400 comes back.
+        response = client.post("/api/sources/youtube", json={"url": "not-a-url"})
 
         assert response.status_code == 400
 

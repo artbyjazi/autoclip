@@ -11,7 +11,18 @@ being validated against a fixed golden video set — see
 
 ### Added
 
-- **Pipeline** — ingest (YouTube via yt-dlp, or file upload), audio preparation,
+- **Any yt-dlp-supported link, not just YouTube.** Twitch VODs and clips work,
+  as do Kick, Vimeo, X and several hundred others. Host validation was replaced
+  with "is this an http URL" — yt-dlp reports unsupported sites far more
+  accurately than an allowlist we would have to maintain. Twitch's own failure
+  modes (subscriber-only VODs, a channel that is live rather than recorded) get
+  their own error messages.
+- **Partial downloads via a time range.** `start_s`/`end_s` on the ingest
+  endpoint fetch only that section of a video — the difference between minutes
+  and hours on a multi-hour stream VOD. A `?t=` timestamp in a pasted link seeds
+  the start automatically. The excerpt is re-based to zero, so every later
+  stage keeps working in file-relative time.
+- **Pipeline** — ingest (any video URL via yt-dlp, or file upload), audio preparation,
   transcription with word-level timings, LLM highlight detection, speaker-tracked
   reframing, ASS caption generation, and export at 9:16 / 1:1 / 16:9.
 - **Four LLM providers** behind one interface: Anthropic, OpenAI-compatible (any
@@ -31,6 +42,16 @@ being validated against a fixed golden video set — see
   support, and provider reachability, and explains what to do about each.
 - **End-to-end test** against real media, covering every stage with only the
   language model's answer scripted.
+
+### Changed
+
+- **`POST /api/sources/youtube` is now `POST /api/sources/url`**, taking optional
+  `start_s` and `end_s`. The old path stays as a deprecated alias that reaches
+  the same handler, so anything scripted against it keeps working.
+- **Schema v2** widens `sources.type` to `youtube | twitch | url | upload`. The
+  v1 CHECK constraint would have rejected a Twitch source outright. SQLite can't
+  alter a CHECK in place, so the migration rebuilds the table; existing rows and
+  the jobs that reference them are covered by tests.
 
 ### Notable fixes during development
 

@@ -4,9 +4,9 @@ Migrations are driven by SQLite's ``user_version`` pragma: each entry in
 :data:`MIGRATIONS` moves the database forward one version. Applying them is
 idempotent, so :func:`migrate` runs safely on every startup.
 
-We use raw ``sqlite3`` rather than an ORM. The schema is six small tables read
-by one local process, so an ORM would add a dependency and a layer of
-indirection without buying anything.
+We use raw ``sqlite3`` rather than an ORM. The schema is a handful of small
+tables read by one local process, so an ORM would add a dependency and a layer
+of indirection without buying anything.
 """
 
 from __future__ import annotations
@@ -100,13 +100,54 @@ CREATE INDEX idx_exports_clip ON exports(clip_id);
 """
 
 
+#: v2 widens ``sources.type``. Ingestion moved from "YouTube or a file" to "any
+#: URL yt-dlp can fetch, or a file", and the v1 CHECK constraint would reject a
+#: Twitch source outright. SQLite can't alter a CHECK in place, so this is the
+#: standard twelve-step dance: build the new table, copy, swap, rebuild indexes.
+#: The table has no indexes or incoming foreign keys of its own — jobs reference
+#: it, and that constraint survives the rename — so the swap is cheap.
+_V2 = """
+CREATE TABLE sources_new (
+    id          TEXT PRIMARY KEY,
+    type        TEXT NOT NULL CHECK (type IN ('youtube', 'twitch', 'url', 'upload')),
+    url         TEXT,
+    filename    TEXT,
+    path        TEXT NOT NULL,
+    title       TEXT NOT NULL DEFAULT '',
+    channel     TEXT,
+    duration_s  REAL NOT NULL DEFAULT 0,
+    width       INTEGER,
+    height      INTEGER,
+    fps         REAL,
+    has_audio   INTEGER NOT NULL DEFAULT 1,
+    has_video   INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL
+);
+
+INSERT INTO sources_new SELECT * FROM sources;
+
+DROP TABLE sources;
+ALTER TABLE sources_new RENAME TO sources;
+"""
+
+
 def _migration_v1(conn: sqlite3.Connection) -> None:
     conn.executescript(_V1)
 
 
+def _migration_v2(conn: sqlite3.Connection) -> None:
+    # Foreign keys must be off for the table swap, or the DROP cascades into
+    # jobs. The pragma is a no-op inside a transaction, so toggle it around one.
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript(_V2)
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
+
 #: Ordered migrations. Index + 1 is the resulting ``user_version``.
 #: Append only — never edit a migration that has shipped.
-MIGRATIONS: list[Callable[[sqlite3.Connection], None]] = [_migration_v1]
+MIGRATIONS: list[Callable[[sqlite3.Connection], None]] = [_migration_v1, _migration_v2]
 
 SCHEMA_VERSION = len(MIGRATIONS)
 

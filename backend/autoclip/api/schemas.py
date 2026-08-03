@@ -51,9 +51,23 @@ class SourceOut(BaseModel):
         )
 
 
-class YouTubeIngestIn(BaseModel):
+class UrlIngestIn(BaseModel):
+    """A link to fetch, plus an optional section of it.
+
+    ``start_s``/``end_s`` exist for multi-hour stream VODs, where downloading
+    and transcribing the whole thing to clip one segment is the dominant cost.
+    Omitted, the whole video is fetched.
+    """
+
     url: str
     cookies_from_browser: str | None = None
+    start_s: float | None = Field(default=None, ge=0)
+    end_s: float | None = Field(default=None, gt=0)
+
+
+#: The old name, kept so existing clients and the deprecated /youtube route
+#: keep type-checking.
+YouTubeIngestIn = UrlIngestIn
 
 
 class JobSettingsIn(BaseModel):
