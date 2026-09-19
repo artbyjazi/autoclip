@@ -22,7 +22,7 @@ export function App() {
         <div className="mx-auto flex max-w-[1600px] items-baseline gap-8 px-6 py-4 lg:px-10">
           <NavLink to="/" className="group flex items-baseline gap-2.5">
             <span className="font-display text-2xl leading-none text-ink-100">
-              Auto<span className="italic text-sodium-500">Clip</span>
+              Clippy
             </span>
           </NavLink>
 
