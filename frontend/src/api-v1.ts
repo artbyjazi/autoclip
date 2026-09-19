@@ -23,6 +23,22 @@ export interface V1VideoCreateOut {
   status: string
 }
 
+export interface V1SourceOut {
+  id: string
+  type: string
+  title: string
+  url: string | null
+  filename: string | null
+  channel: string | null
+  duration_s: number
+  width: number | null
+  height: number | null
+  fps: number | null
+  has_audio: boolean
+  has_video: boolean
+  created_at: string
+}
+
 export interface V1JobOut {
   id: string
   source_id: string
@@ -33,8 +49,22 @@ export interface V1JobOut {
   current_stage: string
   progress: number
   error: string | null
+  provider: string
   created_at: string
   updated_at: string
+  started_at: string | null
+  finished_at: string | null
+  source: V1SourceOut | null
+}
+
+export interface V1ExportOut {
+  id: string
+  clip_id: string
+  ratio: string
+  style: string
+  size_bytes: number
+  kind: string
+  created_at: string
 }
 
 export interface V1ClipOut {
@@ -52,6 +82,9 @@ export interface V1ClipOut {
   status: string
   degraded: boolean
   provider_target: string
+  caption_style: string
+  ratio: string
+  exports: V1ExportOut[]
 }
 
 export interface V1ApiKeyOut {
@@ -103,6 +136,7 @@ async function v1request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (response.status === 401) {
     setToken(null)
+    window.dispatchEvent(new Event('clippy:unauthorized'))
     throw new V1ApiError('Missing or invalid API key. Create one with `clippy api-key create` and paste it.', 401)
   }
 
@@ -136,8 +170,8 @@ export const v1 = {
       body: JSON.stringify({ youtube_url, options }),
     }),
 
-  listVideos: (limit = 25) => v1request<unknown[]>(`/api/v1/videos?limit=${limit}`),
-  getVideo: (id: string) => v1request<unknown>(`/api/v1/videos/${id}`),
+  listVideos: (limit = 25) => v1request<V1SourceOut[]>(`/api/v1/videos?limit=${limit}`),
+  getVideo: (id: string) => v1request<V1SourceOut>(`/api/v1/videos/${id}`),
   deleteVideo: (id: string) =>
     v1request<void>(`/api/v1/videos/${id}`, { method: 'DELETE' }),
   listClips: (videoId: string) =>
@@ -159,6 +193,21 @@ export const v1 = {
   renderClip: (id: string) =>
     v1request<V1JobOut>(`/api/v1/clips/${id}/render`, { method: 'POST' }),
   downloadUrl: (id: string) => `/api/v1/clips/${id}/download`,
+
+  /** Fetch the final MP4 with Bearer auth and return an object URL. */
+  downloadBlob: async (id: string): Promise<string> => {
+    const token = getToken()
+    const response = await fetch(`/api/v1/clips/${id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (response.status === 401) {
+      setToken(null)
+      window.dispatchEvent(new Event('clippy:unauthorized'))
+      throw new V1ApiError('Missing or invalid API key.', 401)
+    }
+    if (!response.ok) throw new V1ApiError(`${response.status} ${response.statusText}`, response.status)
+    return URL.createObjectURL(await response.blob())
+  },
 
   providers: () => v1request<unknown[]>('/api/v1/providers'),
   providersStatus: () => v1request<unknown[]>('/api/v1/providers/status'),

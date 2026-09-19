@@ -1,34 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { api, formatDuration } from '../api'
+import { formatDuration } from '../api'
 import { ErrorNote } from '../components/ErrorNote'
-import { useJobStream } from '../useJobStream'
+import { useV1JobStream } from '../useV1JobStream'
 
-/** Stage order and labels, mirroring clippy.pipeline.Stage. */
+/** v1 current_stage values in pipeline order, per docs/HANDOFF_OPENCODE.md. */
 const STAGES = [
-  { key: 'prepare', label: 'Prepare', note: 'Extracting audio and thumbnails' },
-  { key: 'transcribe', label: 'Transcribe', note: 'Word-level timing' },
-  { key: 'highlights', label: 'Highlights', note: 'Choosing the moments worth cutting' },
+  { key: 'download', label: 'Download', note: 'Fetching the source video' },
+  { key: 'audio', label: 'Audio', note: 'Extracting mono 16 kHz audio' },
+  { key: 'transcription', label: 'Transcribe', note: 'Word-level timing, cloud first' },
+  { key: 'candidates', label: 'Candidates', note: 'Heuristic shortlist, top 20' },
+  { key: 'analysis', label: 'Analysis', note: 'LLM evaluation with failover' },
+  { key: 'ranking', label: 'Ranking', note: 'Virality scores and dedup' },
   { key: 'reframe', label: 'Reframe', note: 'Tracking the speaker into vertical' },
-  { key: 'captions', label: 'Captions', note: 'Building subtitle timing' },
-  { key: 'export', label: 'Export', note: 'Rendering clips' },
+  { key: 'preview', label: 'Preview', note: '540×960 lightweight render' },
+  { key: 'render', label: 'Render', note: '1080×1920 final render' },
+  { key: 'ready_for_review', label: 'Ready', note: 'Clips ranked, awaiting review' },
 ] as const
+
+const TERMINAL_GOOD = new Set(['ready_for_review', 'completed'])
 
 export function JobProgress() {
   const { jobId } = useParams()
   const navigate = useNavigate()
-  const { job, progress } = useJobStream(jobId)
-  const [cancelling, setCancelling] = useState(false)
-  const [actionError, setActionError] = useState<Error | null>(null)
+  const { job, progress, connected } = useV1JobStream(jobId)
 
   useEffect(() => {
-    if (job?.status === 'done') {
+    if (job && TERMINAL_GOOD.has(job.status) && job.kind === 'analysis') {
       // A short hold so the completed state is legible rather than a flash.
-      const timer = setTimeout(() => navigate(`/jobs/${job.id}/clips`), 900)
+      const timer = setTimeout(() => navigate(`/videos/${job.source_id}/clips`), 900)
       return () => clearTimeout(timer)
     }
-  }, [job?.status, job?.id, navigate])
+  }, [job?.status, job?.source_id, navigate])
 
   if (!job) {
     return <p className="pt-24 text-sm text-ink-500">Loading…</p>
@@ -36,42 +40,23 @@ export function JobProgress() {
 
   const activeIndex = STAGES.findIndex((s) => s.key === job.current_stage)
   const percent = Math.round((progress?.overall ?? job.progress) * 100)
-
-  const cancel = async () => {
-    setCancelling(true)
-    setActionError(null)
-    try {
-      await api.cancelJob(job.id)
-    } catch (err) {
-      setActionError(err as Error)
-    } finally {
-      setCancelling(false)
-    }
-  }
-
-  const retry = async () => {
-    setActionError(null)
-    try {
-      await api.retryJob(job.id)
-      window.location.reload()
-    } catch (err) {
-      setActionError(err as Error)
-    }
-  }
+  const failed = job.status === 'failed' || job.status === 'cancelled'
 
   return (
     <div className="pt-14">
       <div className="rise flex flex-wrap items-baseline justify-between gap-6 border-b border-ink-800 pb-6">
         <div className="min-w-0">
-          <p className="eyebrow">{job.status}</p>
+          <p className="eyebrow">
+            {job.kind} · {job.status}
+            {!connected && !TERMINAL_GOOD.has(job.status) && !failed ? ' · reconnecting…' : ''}
+          </p>
           <h1 className="mt-2 max-w-3xl truncate font-display text-[clamp(1.75rem,4vw,3rem)] leading-tight text-ink-100">
             {job.source?.title || 'Untitled'}
           </h1>
           {job.source && (
             <p className="numeric mt-2 text-xs text-ink-500">
               {formatDuration(job.source.duration_s)}
-              {job.source.width ? ` · ${job.source.width}×${job.source.height}` : ''} ·{' '}
-              {job.provider}
+              {job.source.width ? ` · ${job.source.width}×${job.source.height}` : ''}
             </p>
           )}
         </div>
@@ -81,18 +66,11 @@ export function JobProgress() {
             {percent}
             <span className="text-2xl text-ink-600">%</span>
           </span>
-          {(job.status === 'running' || job.status === 'queued') && (
-            <button onClick={cancel} disabled={cancelling} className="btn btn-ghost">
-              {cancelling ? 'Cancelling…' : 'Cancel'}
-            </button>
-          )}
-          {(job.status === 'failed' || job.status === 'cancelled') && (
-            <button onClick={retry} className="btn btn-primary">
-              Retry
-            </button>
-          )}
-          {job.status === 'done' && (
-            <button onClick={() => navigate(`/jobs/${job.id}/clips`)} className="btn btn-primary">
+          {TERMINAL_GOOD.has(job.status) && (
+            <button
+              onClick={() => navigate(`/videos/${job.source_id}/clips`)}
+              className="btn btn-primary"
+            >
               Review clips
             </button>
           )}
@@ -108,22 +86,11 @@ export function JobProgress() {
         </div>
       )}
 
-      {actionError && (
-        <div className="mt-8 max-w-3xl">
-          <ErrorNote error={actionError} onDismiss={() => setActionError(null)} />
-        </div>
-      )}
-
       <ol className="mt-12 max-w-3xl">
         {STAGES.map((stage, index) => {
-          // A failed job stopped *at* current_stage, so that stage must read as
-          // failed rather than as still running — otherwise the checklist claims
-          // work is in progress while the banner says it died.
-          const failedHere =
-            (job.status === 'failed' || job.status === 'cancelled') && index === activeIndex
-
+          const failedHere = failed && index === activeIndex
           const state =
-            job.status === 'done' || (activeIndex >= 0 && index < activeIndex)
+            TERMINAL_GOOD.has(job.status) || (activeIndex >= 0 && index < activeIndex)
               ? 'done'
               : failedHere
                 ? 'stopped'
@@ -178,8 +145,6 @@ export function JobProgress() {
                   </span>
                 </div>
 
-                {/* A hairline that fills. No track chrome — the rule below the
-                    row already provides the container. */}
                 <div className="mt-3 h-px w-full bg-ink-800">
                   <div
                     className="h-px origin-left bg-sodium-500 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
