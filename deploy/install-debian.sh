@@ -12,7 +12,13 @@ test -f /opt/clippy/deploy/clippy.service
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-  ca-certificates curl ffmpeg fonts-liberation git libgl1 libglib2.0-0
+  ca-certificates curl ffmpeg fonts-liberation git libgl1 libglib2.0-0 unzip
+
+# Deno solves YouTube's JS challenges for yt-dlp (see ingest.py
+# `remote_components`). /usr/local/bin is already on the service PATH.
+if ! command -v deno >/dev/null 2>&1; then
+  curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+fi
 
 if ! command -v uv >/dev/null 2>&1; then
   UV_INSTALL_DIR=/usr/local/bin sh -c \

@@ -112,6 +112,10 @@ def ingest_youtube(
         "progress_hooks": [hook],
         "retries": 3,
         "fragment_retries": 3,
+        # YouTube's n-challenge requires a JS runtime (deno ships on the LXC
+        # via install-debian.sh) plus the remote EJS solver. Without this,
+        # authenticated downloads fail with "The page needs to be reloaded".
+        "remote_components": ["ejs:github"],
     }
     if settings.cookies_from_browser:
         # yt-dlp expects a tuple; only the browser name is required.
