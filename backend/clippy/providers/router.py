@@ -28,7 +28,9 @@ DEFAULT_TARGETS = (
     ProviderTarget("gemini-3-6-flash", "llm", "gemini", "gemini-3.6-flash", 95),
     ProviderTarget("groq-gpt-oss-120b", "llm", "groq", "openai/gpt-oss-120b", 90),
     ProviderTarget("groq-gpt-oss-20b", "llm", "groq", "openai/gpt-oss-20b", 85),
-    ProviderTarget("openrouter-free", "llm", "openrouter", "openrouter/free", 70),
+    ProviderTarget(
+        "openrouter-free", "llm", "openrouter", "deepseek/deepseek-v4-flash-0731:free", 70
+    ),
     ProviderTarget("groq-whisper-turbo", "asr", "groq", "whisper-large-v3-turbo", 100),
     ProviderTarget("gemini-transcribe", "asr", "gemini", "gemini-3.5-transcribe", 90),
     ProviderTarget("local-whisper-small", "asr", "local", "small", 10),

@@ -104,9 +104,10 @@ class OpenAIProvider(LLMProvider):
         return choices[0].message.content or ""
 
     async def health_check(self) -> ProviderStatus:
+        suggested = getattr(self, "SUGGESTED_MODELS", SUGGESTED_MODELS)
         if not self.api_key and not self._is_local():
             return ProviderStatus(
-                name=self.name, available=False, detail="No API key set", models=SUGGESTED_MODELS
+                name=self.name, available=False, detail="No API key set", models=suggested
             )
         try:
             client = self._client()
@@ -118,7 +119,7 @@ class OpenAIProvider(LLMProvider):
             name=self.name,
             available=True,
             detail=self.base_url or "https://api.openai.com/v1",
-            models=names or SUGGESTED_MODELS,
+            models=names or suggested,
         )
 
 

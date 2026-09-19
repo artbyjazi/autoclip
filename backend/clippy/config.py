@@ -111,7 +111,8 @@ class Settings(BaseModel):
                 model="openai/gpt-oss-120b", base_url="https://api.groq.com/openai/v1"
             ),
             "openrouter": ProviderSettings(
-                model="openrouter/free", base_url="https://openrouter.ai/api/v1"
+                model="deepseek/deepseek-v4-flash-0731:free",
+                base_url="https://openrouter.ai/api/v1",
             ),
             "ollama": ProviderSettings(model="", base_url="http://localhost:11434"),
         }
