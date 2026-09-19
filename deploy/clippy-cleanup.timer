@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Clippy artifact cleanup
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

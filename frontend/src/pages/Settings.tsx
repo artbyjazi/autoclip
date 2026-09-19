@@ -179,7 +179,7 @@ export function Settings() {
             {!system?.diarization_available && (
               <span className="mt-1 block text-xs text-ink-500">
                 Needs the diarization extra:{' '}
-                <code className="text-ink-300">uv pip install &apos;autoclip[diarization]&apos;</code>
+                <code className="text-ink-300">uv pip install &apos;clippy[diarization]&apos;</code>
               </span>
             )}
           </span>

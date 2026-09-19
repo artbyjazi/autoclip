@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pysubs2
 import pytest
-from autoclip.pipeline import captions
-from autoclip.pipeline.transcript import Word
+from clippy.pipeline import captions
+from clippy.pipeline.transcript import Word
 
 
 def words_from(spec: list[tuple[str, float, float]]) -> list[Word]:
@@ -81,13 +81,22 @@ class TestColour:
 
 
 class TestPresets:
-    def test_all_four_presets_exist(self) -> None:
+    def test_all_five_presets_exist(self) -> None:
         assert set(captions.PRESETS) == {
-            "bold_pop",
-            "karaoke_fill",
-            "clean_lower",
-            "boxed",
+            "bold",
+            "karaoke",
+            "clean",
+            "hormozi",
+            "mrbeast",
         }
+
+    @pytest.mark.parametrize(
+        ("legacy", "current"),
+        [("bold_pop", "bold"), ("karaoke_fill", "karaoke"),
+         ("clean_lower", "clean"), ("boxed", "mrbeast")],
+    )
+    def test_legacy_style_names_remain_readable(self, legacy: str, current: str) -> None:
+        assert captions.get_style(legacy).key == current
 
     @pytest.mark.parametrize("key", list(captions.PRESETS))
     def test_every_preset_ships_its_font(self, key: str) -> None:

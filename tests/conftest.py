@@ -1,7 +1,7 @@
 """Shared pytest fixtures.
 
 The central concern here is isolation: nothing in the test suite may touch the
-user's real ``~/.autoclip`` directory or their real OS keyring.
+user's real ``~/.clippy`` directory or their real OS keyring.
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ import pytest
 # installs put it on the path already; this keeps a bare `pytest` working too.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from autoclip import config, db, paths, system  # noqa: E402
+from clippy import config, db, paths, system  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def autoclip_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
-    """Point AUTOCLIP_HOME at a throwaway directory for every test."""
-    home = tmp_path / "autoclip_home"
+def clippy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """Point CLIPPY_HOME at a throwaway directory for every test."""
+    home = tmp_path / "clippy_home"
     monkeypatch.setenv(paths.ENV_HOME, str(home))
     db.reset_connections()
     system.report.cache_clear()
@@ -31,8 +31,8 @@ def autoclip_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[P
 
 
 @pytest.fixture
-def initialised_db(autoclip_home: Path) -> int:
-    """An AutoClip home with the schema migrated up to date."""
+def initialised_db(clippy_home: Path) -> int:
+    """An Clippy home with the schema migrated up to date."""
     return db.init()
 
 

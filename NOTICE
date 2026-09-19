@@ -1,0 +1,6 @@
+Clippy is derived from AutoClip, copyright Jad Ghazi and contributors,
+licensed under the MIT License included in LICENSE.
+
+The hybrid highlight-ranking implementation adapts complete-thought,
+lexical-scoring, and boundary-tightening ideas from Chopify, used under its
+MIT License. No Chopify source file is copied verbatim.

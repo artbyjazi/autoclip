@@ -12,9 +12,6 @@ dist/
 .coverage
 htmlcov/
 
-# uv
-uv.lock
-
 # Node / frontend
 node_modules/
 frontend/dist/
@@ -23,9 +20,10 @@ frontend/.vite/
 
 # Built frontend, emitted into the Python package by `npm run build`.
 # Regenerated from source; a release build produces it during packaging.
-backend/autoclip/static/
+backend/clippy/static/
 
-# AutoClip runtime artifacts
+# Clippy runtime artifacts
+.clippy/
 .autoclip/
 *.db
 *.sqlite3

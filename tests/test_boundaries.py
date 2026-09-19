@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from autoclip.pipeline import boundaries
-from autoclip.pipeline.prepare import Silence
-from autoclip.pipeline.transcript import Transcript, Word
+from clippy.pipeline import boundaries
+from clippy.pipeline.prepare import Silence
+from clippy.pipeline.transcript import Transcript, Word
 
 
 def make_transcript(sentences: list[list[str]], *, word_duration: float = 0.5) -> Transcript:

@@ -9,8 +9,8 @@ from __future__ import annotations
 import math
 
 import pytest
-from autoclip.pipeline.reframe import croppath, smoothing
-from autoclip.pipeline.reframe.croppath import (
+from clippy.pipeline.reframe import croppath, smoothing
+from clippy.pipeline.reframe.croppath import (
     CropKeyframe,
     CropSegment,
     Strategy,
@@ -20,8 +20,8 @@ from autoclip.pipeline.reframe.croppath import (
     segment_crop_filter,
     target_crop_size,
 )
-from autoclip.pipeline.reframe.faces import FaceObservation
-from autoclip.pipeline.reframe.tracker import build_tracks
+from clippy.pipeline.reframe.faces import FaceObservation
+from clippy.pipeline.reframe.tracker import build_tracks
 
 
 class TestTargetCropSize:

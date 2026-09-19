@@ -10,16 +10,16 @@ import sys
 from collections.abc import Iterator
 
 import pytest
-from autoclip import app as app_module
-from autoclip import config
-from autoclip.app import create_app
-from autoclip.db import store
-from autoclip.db.models import Clip, Job, Source, new_id
+from clippy import app as app_module
+from clippy import config
+from clippy.app import create_app
+from clippy.db import store
+from clippy.db.models import Clip, Job, Source, new_id
 from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client(autoclip_home, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def client(clippy_home, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     # The background worker is off here so queued jobs stay queued: these tests
     # are about the HTTP contract, and a worker racing to pick jobs up would
     # make every status assertion flaky. The worker has its own tests.
@@ -71,19 +71,20 @@ class TestHealthAndSystem:
 
 
 class TestCaptionStyles:
-    def test_lists_all_four(self, client: TestClient) -> None:
+    def test_lists_public_presets(self, client: TestClient) -> None:
         styles = client.get("/api/caption-styles").json()
 
         assert {s["key"] for s in styles} == {
-            "bold_pop",
-            "karaoke_fill",
-            "clean_lower",
-            "boxed",
+            "bold",
+            "karaoke",
+            "clean",
+            "hormozi",
+            "mrbeast",
         }
 
     def test_includes_preview_metadata(self, client: TestClient) -> None:
         styles = client.get("/api/caption-styles").json()
-        preview = next(s for s in styles if s["key"] == "bold_pop")["preview"]
+        preview = next(s for s in styles if s["key"] == "bold")["preview"]
 
         assert preview["accent"]
         assert preview["allCaps"] is True
@@ -94,7 +95,7 @@ class TestSettings:
     def test_get_returns_defaults(self, client: TestClient) -> None:
         body = client.get("/api/settings").json()
 
-        assert body["active_provider"] == "anthropic"
+        assert body["active_provider"] == "gemini"
         assert body["whisper"]["model"] == "small"
 
     def test_partial_update_leaves_other_sections_alone(self, client: TestClient) -> None:
@@ -334,10 +335,10 @@ class TestClips:
         assert client.get(f"/api/clips/{clip_id}/crop-path").status_code == 404
 
     def test_crop_path_is_served_when_present(
-        self, client: TestClient, job_with_clips: Job, autoclip_home
+        self, client: TestClient, job_with_clips: Job, clippy_home
     ) -> None:
-        from autoclip.pipeline.reframe.croppath import centre_crop
-        from autoclip.pipeline.runner import JobWorkspace
+        from clippy.pipeline.reframe.croppath import centre_crop
+        from clippy.pipeline.runner import JobWorkspace
 
         clip = client.get(f"/api/jobs/{job_with_clips.id}/clips").json()[0]
         path = centre_crop(1920, 1080, clip["duration_s"])
@@ -369,6 +370,8 @@ class TestProviderStatus:
             "anthropic",
             "openai",
             "gemini",
+            "groq",
+            "openrouter",
             "ollama",
         }
 
@@ -413,12 +416,12 @@ class TestSecretsNeverLeak:
         assert "DEADBEEF" not in payload
 
     def test_config_file_has_no_secrets_when_keyring_works(
-        self, client: TestClient, fake_keyring, autoclip_home
+        self, client: TestClient, fake_keyring, clippy_home
     ) -> None:
         client.put("/api/settings/secrets", json={"key": "anthropic", "value": "sk-DEADBEEF"})
         client.put("/api/settings", json={"whisper": {"model": "medium"}})
 
-        from autoclip import paths
+        from clippy import paths
 
         assert "DEADBEEF" not in paths.config_path().read_text(encoding="utf-8")
         assert config.get_secret("anthropic") == "sk-DEADBEEF"
