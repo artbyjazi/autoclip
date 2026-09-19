@@ -34,9 +34,10 @@ def test_v1_requires_a_valid_bearer(v1_client) -> None:
     client, headers = v1_client
 
     assert client.get("/api/v1/videos").status_code == 401
-    assert client.get(
-        "/api/v1/videos", headers={"Authorization": "Bearer clp_wrong"}
-    ).status_code == 401
+    assert (
+        client.get("/api/v1/videos", headers={"Authorization": "Bearer clp_wrong"}).status_code
+        == 401
+    )
     assert client.get("/api/v1/videos", headers=headers).status_code == 200
 
 
@@ -79,16 +80,13 @@ def test_public_job_states_are_stable(v1_client) -> None:
     analysis = store.create_job(
         Job(id=new_id(), source_id=source.id, kind="analysis", status="done")
     )
-    render = store.create_job(
-        Job(id=new_id(), source_id=source.id, kind="render", status="done")
-    )
+    render = store.create_job(Job(id=new_id(), source_id=source.id, kind="render", status="done"))
 
-    assert client.get(f"/api/v1/jobs/{analysis.id}", headers=headers).json()[
-        "status"
-    ] == "ready_for_review"
-    assert client.get(f"/api/v1/jobs/{render.id}", headers=headers).json()[
-        "status"
-    ] == "completed"
+    assert (
+        client.get(f"/api/v1/jobs/{analysis.id}", headers=headers).json()["status"]
+        == "ready_for_review"
+    )
+    assert client.get(f"/api/v1/jobs/{render.id}", headers=headers).json()["status"] == "completed"
 
 
 def test_preview_and_render_are_separate_fifo_jobs(v1_client) -> None:

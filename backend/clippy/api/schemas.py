@@ -100,10 +100,14 @@ class JobOut(BaseModel):
             id=job.id,
             source_id=job.source_id,
             status=(
-                "ready_for_review" if job.status == "done" and job.kind == "analysis"
-                else "completed" if job.status == "done"
+                "ready_for_review"
+                if job.status == "done" and job.kind == "analysis"
+                else "completed"
+                if job.status == "done"
                 else job.status
-            ) if public_status else job.status,
+            )
+            if public_status
+            else job.status,
             kind=job.kind,
             clip_id=job.clip_id,
             parent_job_id=job.parent_job_id,

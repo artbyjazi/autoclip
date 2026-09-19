@@ -190,8 +190,11 @@ class PipelineRunner:
             raise
 
         store.update_job(
-            self.job.id, status="done", current_stage=Stage.READY.value,
-            progress=1.0, finished_at=utcnow()
+            self.job.id,
+            status="done",
+            current_stage=Stage.READY.value,
+            progress=1.0,
+            finished_at=utcnow(),
         )
         return clips
 
@@ -499,8 +502,11 @@ def run_render_job(
 
     stage = Stage.PREVIEW if job.kind == "preview" else Stage.RENDER
     store.update_job(
-        job.id, status="running", current_stage=stage.value,
-        started_at=utcnow(), error=None,
+        job.id,
+        status="running",
+        current_stage=stage.value,
+        started_at=utcnow(),
+        error=None,
     )
 
     def report(fraction: float) -> None:
@@ -530,8 +536,8 @@ def run_render_job(
         settings.export.ratio = "9:16"
         settings.export.crf = 28 if job.kind == "preview" else 21
         settings.export.preset = "ultrafast" if job.kind == "preview" else "veryfast"
-        settings.export.prefer_hardware_encoder = False if job.kind == "preview" else (
-            settings.export.prefer_hardware_encoder
+        settings.export.prefer_hardware_encoder = (
+            False if job.kind == "preview" else (settings.export.prefer_hardware_encoder)
         )
         style = captions.get_style(edit.caption_style if edit else settings.export.caption_style)
 
@@ -542,8 +548,11 @@ def run_render_job(
             from .reframe.croppath import centre_crop
 
             crop_path = centre_crop(
-                source.width or 1920, source.height or 1080,
-                clip.end_s - clip.start_s, aspect_w=9, aspect_h=16,
+                source.width or 1920,
+                source.height or 1080,
+                clip.end_s - clip.start_s,
+                aspect_w=9,
+                aspect_h=16,
             )
 
         if job.kind == "preview":
@@ -551,18 +560,26 @@ def run_render_job(
             output_width, output_height = 540, 960
             artifact_kind = "preview"
         else:
-            destination = paths.exports_dir() / analysis_job_id / export.output_filename(
-                clip.title or f"clip-{clip.rank}", "9:16"
+            destination = (
+                paths.exports_dir()
+                / analysis_job_id
+                / export.output_filename(clip.title or f"clip-{clip.rank}", "9:16")
             )
             output_width = output_height = None
             artifact_kind = "final"
 
         export.export_clip(
             export.ExportRequest(
-                source=Path(source.path), destination=destination,
-                start_s=clip.start_s, end_s=clip.end_s, crop_path=crop_path,
-                words=words, style=style, ratio="9:16",
-                output_width=output_width, output_height=output_height,
+                source=Path(source.path),
+                destination=destination,
+                start_s=clip.start_s,
+                end_s=clip.end_s,
+                crop_path=crop_path,
+                words=words,
+                style=style,
+                ratio="9:16",
+                output_width=output_width,
+                output_height=output_height,
             ),
             work_dir=workspace.captions_dir,
             settings=settings.export,
@@ -570,16 +587,24 @@ def run_render_job(
             cancelled=cancelled,
         )
         record = Export(
-            id=new_id(), clip_id=clip.id, path=str(destination), ratio="9:16",
-            style=style.key, size_bytes=destination.stat().st_size,
-            job_id=job.id, kind=artifact_kind,
+            id=new_id(),
+            clip_id=clip.id,
+            path=str(destination),
+            ratio="9:16",
+            style=style.key,
+            size_bytes=destination.stat().st_size,
+            job_id=job.id,
+            kind=artifact_kind,
         )
         store.create_export(record)
         if artifact_kind == "final":
             store.update_clip(clip.id, status="exported")
         store.update_job(
-            job.id, status="done", progress=1.0,
-            current_stage=stage.value, finished_at=utcnow(),
+            job.id,
+            status="done",
+            progress=1.0,
+            current_stage=stage.value,
+            finished_at=utcnow(),
         )
         return record
     except JobCancelled:

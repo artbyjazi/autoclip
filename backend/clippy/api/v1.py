@@ -48,7 +48,9 @@ async def health() -> dict:
 
 
 @router.post(
-    "/videos", response_model=VideoCreateOut, status_code=status.HTTP_202_ACCEPTED,
+    "/videos",
+    response_model=VideoCreateOut,
+    status_code=status.HTTP_202_ACCEPTED,
     tags=["videos"],
 )
 async def create_video(payload: VideoCreateIn) -> VideoCreateOut:
@@ -56,8 +58,11 @@ async def create_video(payload: VideoCreateIn) -> VideoCreateOut:
         raise HTTPException(status_code=400, detail="That is not a YouTube URL.")
 
     source = Source(
-        id=new_id(), type="youtube", url=payload.youtube_url,
-        path="", title=payload.youtube_url,
+        id=new_id(),
+        type="youtube",
+        url=payload.youtube_url,
+        path="",
+        title=payload.youtube_url,
     )
     settings = legacy_jobs._apply_overrides(config.load(), payload.options)
     settings.export.ratio = "9:16"
@@ -68,8 +73,11 @@ async def create_video(payload: VideoCreateIn) -> VideoCreateOut:
     if not await asyncio.to_thread(storage.enough_space, settings.storage):
         raise HTTPException(status_code=507, detail="Not enough free space for a new video job.")
     job = Job(
-        id=new_id(), source_id=source.id, kind="analysis",
-        provider="automatic", settings=settings.model_dump(mode="json"),
+        id=new_id(),
+        source_id=source.id,
+        kind="analysis",
+        provider="automatic",
+        settings=settings.model_dump(mode="json"),
     )
     await asyncio.to_thread(store.create_source, source)
     await asyncio.to_thread(store.create_job, job)
@@ -158,16 +166,21 @@ def _new_render_job(clip_id: str, kind: str, payload: RenderJobIn) -> Job:
     settings.export.ratio = "9:16"
     return store.create_job(
         Job(
-            id=new_id(), source_id=parent.source_id, kind=kind,
-            clip_id=clip.id, parent_job_id=parent.id,
+            id=new_id(),
+            source_id=parent.source_id,
+            kind=kind,
+            clip_id=clip.id,
+            parent_job_id=parent.id,
             settings=settings.model_dump(mode="json"),
         )
     )
 
 
 @router.post(
-    "/clips/{clip_id}/preview", response_model=JobOut,
-    status_code=status.HTTP_202_ACCEPTED, tags=["clips"],
+    "/clips/{clip_id}/preview",
+    response_model=JobOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["clips"],
 )
 async def preview_clip(clip_id: str, payload: RenderJobIn = RenderJobIn()) -> JobOut:
     job = await asyncio.to_thread(_new_render_job, clip_id, "preview", payload)
@@ -176,8 +189,10 @@ async def preview_clip(clip_id: str, payload: RenderJobIn = RenderJobIn()) -> Jo
 
 
 @router.post(
-    "/clips/{clip_id}/render", response_model=JobOut,
-    status_code=status.HTTP_202_ACCEPTED, tags=["clips"],
+    "/clips/{clip_id}/render",
+    response_model=JobOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["clips"],
 )
 async def render_clip(clip_id: str, payload: RenderJobIn = RenderJobIn()) -> JobOut:
     job = await asyncio.to_thread(_new_render_job, clip_id, "render", payload)
@@ -245,22 +260,25 @@ async def cleanup_storage() -> dict:
 async def api_keys() -> list[ApiKeyOut]:
     records = await asyncio.to_thread(store.list_api_keys)
     return [
-        ApiKeyOut(
-            **{key: value for key, value in vars(item).items() if key != "token_hash"}
-        )
+        ApiKeyOut(**{key: value for key, value in vars(item).items() if key != "token_hash"})
         for item in records
     ]
 
 
 @router.post(
-    "/api-keys", response_model=ApiKeyCreatedOut,
-    status_code=status.HTTP_201_CREATED, tags=["api-keys"],
+    "/api-keys",
+    response_model=ApiKeyCreatedOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["api-keys"],
 )
 async def new_api_key(payload: ApiKeyCreateIn) -> ApiKeyCreatedOut:
     record, token = await asyncio.to_thread(create_api_key, payload.name)
     return ApiKeyCreatedOut(
-        id=record.id, name=record.name, prefix=record.prefix,
-        created_at=record.created_at, token=token,
+        id=record.id,
+        name=record.name,
+        prefix=record.prefix,
+        created_at=record.created_at,
+        token=token,
     )
 
 

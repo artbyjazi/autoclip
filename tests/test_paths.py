@@ -41,9 +41,7 @@ class TestLegacyHomeMigration:
         monkeypatch.delenv(paths.ENV_HOME, raising=False)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
 
-    def test_legacy_directory_is_migrated_when_the_new_one_is_absent(
-        self, tmp_path: Path
-    ) -> None:
+    def test_legacy_directory_is_migrated_when_the_new_one_is_absent(self, tmp_path: Path) -> None:
         legacy = tmp_path / paths.LEGACY_DIR_NAMES[0]
         legacy.mkdir()
         (legacy / paths.LEGACY_DB_NAMES[0]).write_bytes(b"SQLite format 3\x00")

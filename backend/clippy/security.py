@@ -27,8 +27,10 @@ def hash_token(token: str) -> str:
 def create_api_key(name: str) -> tuple[ApiKey, str]:
     token = "clp_" + secrets.token_urlsafe(32)
     record = ApiKey(
-        id=new_id(), name=name.strip() or "API key",
-        prefix=token[:12], token_hash=hash_token(token),
+        id=new_id(),
+        name=name.strip() or "API key",
+        prefix=token[:12],
+        token_hash=hash_token(token),
     )
     store.create_api_key(record)
     return record, token

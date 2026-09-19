@@ -166,10 +166,7 @@ async def detect(
             return candidates
 
     results = await asyncio.gather(
-        *(
-            run_window(window, seed)
-            for window, seed in zip(windows, seeds, strict=True)
-        )
+        *(run_window(window, seed) for window, seed in zip(windows, seeds, strict=True))
     )
     candidates = [c for group in results for c in group]
 
@@ -249,12 +246,33 @@ def build_clips(
 
 
 _HOOK_TERMS = (
-    "nobody", "secret", "mistake", "wrong", "never", "why", "how", "truth",
-    "biggest", "most people", "here's", "imagine", "what if",
+    "nobody",
+    "secret",
+    "mistake",
+    "wrong",
+    "never",
+    "why",
+    "how",
+    "truth",
+    "biggest",
+    "most people",
+    "here's",
+    "imagine",
+    "what if",
 )
 _PAYOFF_TERMS = (
-    "therefore", "that's why", "the lesson", "the point", "so you", "result",
-    "solution", "fix", "because", "instead", "finally", "turns out",
+    "therefore",
+    "that's why",
+    "the lesson",
+    "the point",
+    "so you",
+    "result",
+    "solution",
+    "fix",
+    "because",
+    "instead",
+    "finally",
+    "turns out",
 )
 _WEAK_OPENERS = ("so ", "yeah ", "um ", "uh ", "and then ", "anyway ", "basically ")
 
@@ -299,30 +317,41 @@ def generate_heuristic_candidates(
             clarity = 80 if len(text.split()) >= 35 else 60
             energy = min(90, 55 + text.count("!") * 8 + text.count("?") * 5)
             surprise = (
-                75
-                if any(term in lowered for term in ("but ", "actually", "turns out"))
-                else 55
+                75 if any(term in lowered for term in ("but ", "actually", "turns out")) else 55
             )
             retention = round((hook + payoff + clarity) / 3)
             overall = round(
-                hook * 0.25 + retention * 0.18 + clarity * 0.12 + payoff * 0.18
-                + complete * 0.17 + energy * 0.05 + surprise * 0.05
+                hook * 0.25
+                + retention * 0.18
+                + clarity * 0.12
+                + payoff * 0.18
+                + complete * 0.17
+                + energy * 0.05
+                + surprise * 0.05
             )
             scores = {
-                "hook": max(0, min(100, hook)), "retention": retention,
-                "clarity": clarity, "insight": payoff, "emotion": energy,
-                "surprise": surprise, "energy": energy,
-                "standalone_context": clarity, "complete_thought": complete,
+                "hook": max(0, min(100, hook)),
+                "retention": retention,
+                "clarity": clarity,
+                "insight": payoff,
+                "emotion": energy,
+                "surprise": surprise,
+                "energy": energy,
+                "standalone_context": clarity,
+                "complete_thought": complete,
                 "payoff": payoff,
             }
             candidates.append(
                 ClipCandidate(
-                    start_word_index=start, end_word_index=end,
+                    start_word_index=start,
+                    end_word_index=end,
                     title=" ".join(text.split()[:8]).rstrip(".,!?"),
-                    hook=" ".join(text.split()[:12]), score=max(0, min(100, overall)),
+                    hook=" ".join(text.split()[:12]),
+                    score=max(0, min(100, overall)),
                     scores=scores,
                     reason="Heuristic shortlist: complete thought with hook and payoff signals.",
-                    degraded=True, provider_target="heuristic-local",
+                    degraded=True,
+                    provider_target="heuristic-local",
                 )
             )
             # Prefer the tightest complete arc from this opening.

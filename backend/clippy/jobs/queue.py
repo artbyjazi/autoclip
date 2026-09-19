@@ -136,7 +136,9 @@ class JobQueue:
         try:
             if job.kind == "analysis":
                 runner = PipelineRunner(
-                    job, source, on_progress=on_progress,
+                    job,
+                    source,
+                    on_progress=on_progress,
                     is_cancelled=lambda: self.is_cancelled(job.id),
                 )
                 clips = await asyncio.to_thread(_run_blocking, runner)
@@ -145,7 +147,10 @@ class JobQueue:
                 from ..pipeline.runner import run_render_job
 
                 await asyncio.to_thread(
-                    run_render_job, job, source, on_progress,
+                    run_render_job,
+                    job,
+                    source,
+                    on_progress,
                     lambda: self.is_cancelled(job.id),
                 )
                 result_count = 1

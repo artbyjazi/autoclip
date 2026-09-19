@@ -92,8 +92,12 @@ class TestPresets:
 
     @pytest.mark.parametrize(
         ("legacy", "current"),
-        [("bold_pop", "bold"), ("karaoke_fill", "karaoke"),
-         ("clean_lower", "clean"), ("boxed", "mrbeast")],
+        [
+            ("bold_pop", "bold"),
+            ("karaoke_fill", "karaoke"),
+            ("clean_lower", "clean"),
+            ("boxed", "mrbeast"),
+        ],
     )
     def test_legacy_style_names_remain_readable(self, legacy: str, current: str) -> None:
         assert captions.get_style(legacy).key == current

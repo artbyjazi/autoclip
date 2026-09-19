@@ -79,9 +79,15 @@ def classify_error(exc: Exception) -> tuple[str, float]:
 
 
 def record_result(
-    target: ProviderTarget, *, job_id: str | None, operation: str,
-    started: float, error: Exception | None = None, audio_seconds: float = 0.0,
-    input_tokens: int = 0, output_tokens: int = 0,
+    target: ProviderTarget,
+    *,
+    job_id: str | None,
+    operation: str,
+    started: float,
+    error: Exception | None = None,
+    audio_seconds: float = 0.0,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
 ) -> None:
     latency_ms = round((time.monotonic() - started) * 1000)
     if error is None:
@@ -94,15 +100,24 @@ def record_result(
             timespec="seconds"
         )
         store.update_provider_runtime(
-            target.id, health="auth_failed" if error_type == "auth" else "cooldown",
-            cooldown_until=cooldown, error=str(error)[:500], success=False,
+            target.id,
+            health="auth_failed" if error_type == "auth" else "cooldown",
+            cooldown_until=cooldown,
+            error=str(error)[:500],
+            success=False,
         )
         status = "error"
     store.create_provider_usage(
         ProviderUsage(
-            id=new_id(), target_id=target.id, job_id=job_id, operation=operation,
-            status=status, error_type=error_type, latency_ms=latency_ms,
-            audio_seconds=audio_seconds, input_tokens=input_tokens,
+            id=new_id(),
+            target_id=target.id,
+            job_id=job_id,
+            operation=operation,
+            status=status,
+            error_type=error_type,
+            latency_ms=latency_ms,
+            audio_seconds=audio_seconds,
+            input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
     )
@@ -124,9 +139,7 @@ class ProviderRouter(LLMProvider):
 
     async def health_check(self) -> ProviderStatus:
         usable = [
-            target.id
-            for target in store.list_provider_targets("llm")
-            if target_available(target)
+            target.id for target in store.list_provider_targets("llm") if target_available(target)
         ]
         return ProviderStatus(name=self.name, available=bool(usable), detail=", ".join(usable))
 
@@ -164,8 +177,11 @@ class ProviderRouter(LLMProvider):
                         await asyncio.sleep(0.5 + random.random() * 0.5)
                         continue
                     record_result(
-                        target, job_id=self.job_id, operation="highlight",
-                        started=started, error=exc,
+                        target,
+                        job_id=self.job_id,
+                        operation="highlight",
+                        started=started,
+                        error=exc,
                     )
                     errors.append(f"{target.id}: {exc}")
                     break
@@ -173,13 +189,18 @@ class ProviderRouter(LLMProvider):
                 continue
             input_tokens, output_tokens = provider.last_usage
             record_result(
-                target, job_id=self.job_id, operation="highlight", started=started,
-                input_tokens=input_tokens, output_tokens=output_tokens,
+                target,
+                job_id=self.job_id,
+                operation="highlight",
+                started=started,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
             )
             for candidate in result.clips:
                 candidate.provider_target = target.id
             return result
         raise ProviderError(
-            "All configured LLM targets failed.", provider="router",
+            "All configured LLM targets failed.",
+            provider="router",
             hint="; ".join(errors[-3:]) or "No target has a usable API key.",
         )

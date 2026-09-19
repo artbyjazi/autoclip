@@ -49,7 +49,9 @@ class GroqWhisperProvider:
         client = OpenAI(api_key=self.api_key, base_url="https://api.groq.com/openai/v1")
         with audio.open("rb") as handle:
             response = client.audio.transcriptions.create(
-                file=handle, model=self.model, language=language or None,
+                file=handle,
+                model=self.model,
+                language=language or None,
                 response_format="verbose_json",
                 timestamp_granularities=["word", "segment"],
             )
@@ -70,18 +72,22 @@ class GeminiTranscriptionProvider:
         client = genai.Client(api_key=self.api_key)
         uploaded = client.files.upload(file=str(audio))
         input_item = {
-            "type": "audio", "uri": uploaded.uri,
+            "type": "audio",
+            "uri": uploaded.uri,
             "mime_type": getattr(uploaded, "mime_type", "audio/flac"),
         }
         mode: dict[str, Any] = {
-            "type": "verbatim", "timestamp_granularities": ["word"],
+            "type": "verbatim",
+            "timestamp_granularities": ["word"],
             "diarization_mode": "speaker",
         }
         if language:
             mode["language_codes"] = [language]
         try:
             interaction = client.interactions.create(
-                model=self.model, input=[input_item], mode=mode,
+                model=self.model,
+                input=[input_item],
+                mode=mode,
             )
             return _transcript_from_gemini(interaction, model=self.model)
         finally:
@@ -173,10 +179,24 @@ def _chunk_spans(duration_s: float) -> list[tuple[float, float]]:
 
 def _extract_chunk(source: Path, destination: Path, start: float, duration: float) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    ffmpeg.run([
-        "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(source),
-        "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", str(destination),
-    ])
+    ffmpeg.run(
+        [
+            "-ss",
+            f"{start:.3f}",
+            "-t",
+            f"{duration:.3f}",
+            "-i",
+            str(source),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-c:a",
+            "flac",
+            str(destination),
+        ]
+    )
 
 
 def _provider_for(target: ProviderTarget, settings: Settings) -> TranscriptionProvider | None:
@@ -213,15 +233,22 @@ def _transcribe_chunk(
                     time.sleep(0.5 + random.random() * 0.5)
                     continue
                 record_result(
-                    target, job_id=job_id, operation="transcribe", started=started,
-                    error=exc, audio_seconds=audio_seconds,
+                    target,
+                    job_id=job_id,
+                    operation="transcribe",
+                    started=started,
+                    error=exc,
+                    audio_seconds=audio_seconds,
                 )
                 errors.append(f"{target.id}: {exc}")
                 break
         if transcript is None:
             continue
         record_result(
-            target, job_id=job_id, operation="transcribe", started=started,
+            target,
+            job_id=job_id,
+            operation="transcribe",
+            started=started,
             audio_seconds=audio_seconds,
         )
         return transcript, target.id
@@ -233,7 +260,8 @@ def _transcript_from_openai(response: Any, *, model: str, source: str) -> Transc
     words = [
         Word(
             text=str(_value(item, "word", "")).strip(),
-            start=float(_value(item, "start", 0)), end=float(_value(item, "end", 0)),
+            start=float(_value(item, "start", 0)),
+            end=float(_value(item, "end", 0)),
         )
         for item in raw_words
         if str(_value(item, "word", "")).strip()
@@ -271,8 +299,11 @@ def _from_words(words: list[Word], *, model: str, source: str) -> Transcript:
             span = words[first : index + 1]
             transcript.segments.append(
                 Segment(
-                    text=" ".join(item.text for item in span), start=span[0].start,
-                    end=span[-1].end, first_word=first, last_word=index,
+                    text=" ".join(item.text for item in span),
+                    start=span[0].start,
+                    end=span[-1].end,
+                    first_word=first,
+                    last_word=index,
                     speaker=span[0].speaker,
                 )
             )
@@ -284,7 +315,9 @@ def _merge_chunk(destination: Transcript, chunk: Transcript, *, offset: float) -
     threshold = destination.words[-1].end - 0.1 if destination.words else -1.0
     for word in chunk.words:
         shifted = Word(
-            text=word.text, start=word.start + offset, end=word.end + offset,
+            text=word.text,
+            start=word.start + offset,
+            end=word.end + offset,
             speaker=word.speaker,
         )
         if shifted.start < threshold:

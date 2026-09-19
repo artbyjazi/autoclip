@@ -16,7 +16,12 @@ def test_defaults_load_without_a_config_file() -> None:
     assert settings.whisper.model == "small"
     assert settings.export.loudness_lufs == -14.0
     assert set(settings.providers) == {
-        "anthropic", "openai", "gemini", "groq", "openrouter", "ollama"
+        "anthropic",
+        "openai",
+        "gemini",
+        "groq",
+        "openrouter",
+        "ollama",
     }
 
 

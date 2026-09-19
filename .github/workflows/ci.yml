@@ -96,7 +96,7 @@ jobs:
           uv run --no-sync ruff format --check .
 
       - name: Type check
-        run: uv run --no-sync mypy backend/autoclip
+        run: uv run --no-sync mypy backend/clippy
         continue-on-error: true
 
       - name: Unit tests
@@ -143,13 +143,13 @@ jobs:
           target: base
           push: false
           load: true
-          tags: autoclip:ci
+          tags: clippy:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Smoke test
         run: |
-          docker run -d --name autoclip -p 8000:8000 autoclip:ci
+          docker run -d --name clippy -p 8000:8000 clippy:ci
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:8000/api/health; then
               echo "\nHealthy."
@@ -158,5 +158,5 @@ jobs:
             sleep 2
           done
           echo "::error::Container never became healthy."
-          docker logs autoclip
+          docker logs clippy
           exit 1

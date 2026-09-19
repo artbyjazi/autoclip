@@ -30,10 +30,7 @@ def enough_space(settings: StorageSettings) -> bool:
 
 def cleanup(settings: StorageSettings) -> dict[str, int]:
     now = datetime.now(UTC)
-    active = {
-        job.id for job in store.list_jobs(limit=1000)
-        if job.status in ("queued", "running")
-    }
+    active = {job.id for job in store.list_jobs(limit=1000) if job.status in ("queued", "running")}
     removed = {"previews": 0, "sources": 0, "chunks": 0, "bytes": 0}
 
     preview_cutoff = now - timedelta(hours=settings.preview_retention_hours)
@@ -52,8 +49,7 @@ def cleanup(settings: StorageSettings) -> dict[str, int]:
                 removed["chunks"] += 1
 
     active_sources = {
-        job.source_id for job in store.list_jobs(limit=1000)
-        if job.status in ("queued", "running")
+        job.source_id for job in store.list_jobs(limit=1000) if job.status in ("queued", "running")
     }
     for source in store.list_sources(limit=1000):
         if source.id in active_sources:
@@ -71,9 +67,7 @@ def cleanup(settings: StorageSettings) -> dict[str, int]:
     return removed
 
 
-def _remove_old_files(
-    directory: Path, cutoff: datetime, counters: dict[str, int], key: str
-) -> int:
+def _remove_old_files(directory: Path, cutoff: datetime, counters: dict[str, int], key: str) -> int:
     freed = 0
     if not directory.is_dir():
         return freed

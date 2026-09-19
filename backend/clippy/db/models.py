@@ -246,11 +246,18 @@ class ProviderTarget:
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> ProviderTarget:
         return cls(
-            id=row["id"], purpose=row["purpose"], provider=row["provider"],
-            model=row["model"], priority=row["priority"], enabled=bool(row["enabled"]),
-            health=row["health"], cooldown_until=row["cooldown_until"],
-            consecutive_errors=row["consecutive_errors"], last_error=row["last_error"],
-            last_success=row["last_success"], updated_at=row["updated_at"],
+            id=row["id"],
+            purpose=row["purpose"],
+            provider=row["provider"],
+            model=row["model"],
+            priority=row["priority"],
+            enabled=bool(row["enabled"]),
+            health=row["health"],
+            cooldown_until=row["cooldown_until"],
+            consecutive_errors=row["consecutive_errors"],
+            last_error=row["last_error"],
+            last_success=row["last_success"],
+            updated_at=row["updated_at"],
         )
 
 

@@ -74,9 +74,21 @@ def update_source(source: Source) -> None:
                 duration_s=?, width=?, height=?, fps=?, has_audio=?, has_video=?
             WHERE id=?
             """,
-            (source.type, source.url, source.filename, source.path, source.title,
-             source.channel, source.duration_s, source.width, source.height, source.fps,
-             int(source.has_audio), int(source.has_video), source.id),
+            (
+                source.type,
+                source.url,
+                source.filename,
+                source.path,
+                source.title,
+                source.channel,
+                source.duration_s,
+                source.width,
+                source.height,
+                source.fps,
+                int(source.has_audio),
+                int(source.has_video),
+                source.id,
+            ),
         )
 
 
@@ -434,8 +446,7 @@ def list_exports(clip_id: str) -> list[Export]:
 def latest_export(clip_id: str, *, kind: str = "final") -> Export | None:
     with connection() as conn:
         row = conn.execute(
-            "SELECT * FROM exports WHERE clip_id = ? AND kind = ? "
-            "ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM exports WHERE clip_id = ? AND kind = ? ORDER BY created_at DESC LIMIT 1",
             (clip_id, kind),
         ).fetchone()
     return Export.from_row(row) if row else None
@@ -465,10 +476,20 @@ def upsert_provider_target(target: ProviderTarget) -> ProviderTarget:
                 model=excluded.model, priority=excluded.priority,
                 enabled=excluded.enabled, updated_at=excluded.updated_at
             """,
-            (target.id, target.purpose, target.provider, target.model, target.priority,
-             int(target.enabled), target.health, target.cooldown_until,
-             target.consecutive_errors, target.last_error, target.last_success,
-             target.updated_at),
+            (
+                target.id,
+                target.purpose,
+                target.provider,
+                target.model,
+                target.priority,
+                int(target.enabled),
+                target.health,
+                target.cooldown_until,
+                target.consecutive_errors,
+                target.last_error,
+                target.last_success,
+                target.updated_at,
+            ),
         )
     return target
 
@@ -486,8 +507,12 @@ def list_provider_targets(purpose: str | None = None) -> list[ProviderTarget]:
 
 
 def update_provider_runtime(
-    target_id: str, *, health: str, cooldown_until: str | None = None,
-    error: str | None = None, success: bool = False,
+    target_id: str,
+    *,
+    health: str,
+    cooldown_until: str | None = None,
+    error: str | None = None,
+    success: bool = False,
 ) -> None:
     with connection() as conn:
         conn.execute(
@@ -498,8 +523,14 @@ def update_provider_runtime(
                 updated_at=? WHERE id=?
             """,
             (
-                health, cooldown_until, error, int(success), utcnow(),
-                int(success), utcnow(), target_id,
+                health,
+                cooldown_until,
+                error,
+                int(success),
+                utcnow(),
+                int(success),
+                utcnow(),
+                target_id,
             ),
         )
 
@@ -526,9 +557,19 @@ def create_provider_usage(usage: ProviderUsage) -> ProviderUsage:
                  input_tokens, output_tokens, audio_seconds, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (usage.id, usage.target_id, usage.job_id, usage.operation, usage.status,
-             usage.error_type, usage.latency_ms, usage.input_tokens, usage.output_tokens,
-             usage.audio_seconds, usage.created_at),
+            (
+                usage.id,
+                usage.target_id,
+                usage.job_id,
+                usage.operation,
+                usage.status,
+                usage.error_type,
+                usage.latency_ms,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.audio_seconds,
+                usage.created_at,
+            ),
         )
     return usage
 

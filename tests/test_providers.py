@@ -198,9 +198,7 @@ class TestRegistry:
     def test_all_providers_are_registered(self) -> None:
         from clippy.providers import PROVIDERS
 
-        assert set(PROVIDERS) == {
-            "anthropic", "openai", "gemini", "groq", "openrouter", "ollama"
-        }
+        assert set(PROVIDERS) == {"anthropic", "openai", "gemini", "groq", "openrouter", "ollama"}
 
     def test_ollama_needs_no_key(self) -> None:
         from clippy.providers import OllamaProvider

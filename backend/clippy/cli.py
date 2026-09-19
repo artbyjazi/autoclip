@@ -431,7 +431,10 @@ def api_key_list() -> None:
     table = Table("ID", "Name", "Prefix", "Created", "Last used")
     for record in store.list_api_keys():
         table.add_row(
-            record.id, record.name, record.prefix + "…", record.created_at,
+            record.id,
+            record.name,
+            record.prefix + "…",
+            record.created_at,
             record.last_used_at or "never",
         )
     console.print(table)
