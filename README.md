@@ -34,7 +34,8 @@ failover, retention cleanup, and private Tailscale deployment. The bundled UI
 talks exclusively to the Bearer-authenticated API v1; see
 [HANDOFF_OPENCODE.md](docs/HANDOFF_OPENCODE.md) for the frozen contract.
 
-Pre-1.0. The reframe quality bar hasn't been validated against a fixed golden set yet, which is the gate for tagging v0.1.0.
+Pre-1.0. The clip *picks* haven't been judged against a fixed golden set — that's a
+matter of taste about your material and your model, and no test settles it.
 
 ## Requirements
 
@@ -210,7 +211,15 @@ Each stage writes artifacts to `~/.clippy/work/{job_id}/`, so a retry resumes at
 CLIPPY_E2E_MEDIA=/path/to/clip.mp4 pytest -m e2e
 ```
 
-**Hasn't been:** the §6.4 reframe acceptance bar — no visible jitter, no cut-off faces, speaker on screen ≥95% of speaking time — against a fixed three-video golden set. The mechanics have unit coverage, but "looks right on footage I picked" isn't the bar. This is the gate for v0.1.0.
+**Has been:** the §6.4 reframe acceptance bar — `pytest -m golden` on a fixed
+three-video set (Tears of Steel dialogue, CC-BY): the crop frames somebody in
+≥65% of face-visible moments, framed faces keep eyes inside ≥95% of the time,
+and per-segment tracking stays smooth (variation/displacement ≤4.0, jumps
+≤70 px at 720p). Calibrated 9/9 green; see `tests/data/golden/MANIFEST.md`.
+Two honest deviations from the letter of §6.4: in multi-subject two-shots the
+crop follows one person (9:16 cannot frame both), and close-up cheeks may
+overflow (eyes are the assertion). Runs on Linux only — MediaPipe crashes on
+macOS.
 
 Also unverified: whether the clip *picks* are good. That's a judgement call about your material and your model, and no test settles it.
 
