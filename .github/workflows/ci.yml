@@ -107,6 +107,30 @@ jobs:
         # encoder problems that unit tests structurally cannot.
         run: uv run --no-sync pytest -m "slow and not golden and not e2e" -q
 
+  golden:
+    name: Golden reframe bar (§6.4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install ffmpeg and vision libs
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libgl1 libglib2.0-0
+
+      - name: Create the environment
+        run: uv venv --python 3.12
+
+      - name: Install
+        run: uv pip install -e ".[dev]"
+
+      - name: Golden tests
+        # Fixed three-video set in tests/data/golden/. Release gate for v0.1.0.
+        run: uv run --no-sync pytest -m "golden" -q
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -126,6 +150,10 @@ jobs:
       - name: Type check and build
         working-directory: frontend
         run: npm run build
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: npm test
 
   docker:
     name: Docker image
