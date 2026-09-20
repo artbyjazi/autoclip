@@ -7,7 +7,6 @@ port, with a pipeline that turns long video into short clips.
                      ┌──────────────────────────────────────┐
   browser  ◀────────▶│ FastAPI (backend/clippy/app.py)      │
                      │  · /api/v1/*     Bearer REST + SSE   │
-                     │  · /api/*        deprecated aliases  │
                      │  · /*            built React bundle  │
                      └───────────────┬──────────────────────┘
                                      │

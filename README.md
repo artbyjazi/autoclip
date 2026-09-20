@@ -31,8 +31,8 @@ the server.
 The v0.1 backend provides durable analysis/preview/render jobs, resumable ASR,
 hybrid ranking, 9:16 CPU rendering, Bearer-authenticated API v1, provider
 failover, retention cleanup, and private Tailscale deployment. The bundled UI
-is the legacy compatibility client; its Clippy redesign is handed off in
-[HANDOFF_OPENCODE.md](docs/HANDOFF_OPENCODE.md).
+talks exclusively to the Bearer-authenticated API v1; see
+[HANDOFF_OPENCODE.md](docs/HANDOFF_OPENCODE.md) for the frozen contract.
 
 Pre-1.0. The reframe quality bar hasn't been validated against a fixed golden set yet, which is the gate for tagging v0.1.0.
 

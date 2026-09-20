@@ -118,97 +118,6 @@
         "title": "ApiKeyOut",
         "type": "object"
       },
-      "Body_upload_source_api_sources_upload_post": {
-        "properties": {
-          "file": {
-            "contentMediaType": "application/octet-stream",
-            "title": "File",
-            "type": "string"
-          }
-        },
-        "required": [
-          "file"
-        ],
-        "title": "Body_upload_source_api_sources_upload_post",
-        "type": "object"
-      },
-      "CaptionPatchIn": {
-        "description": "Word-level caption edits for one clip.",
-        "properties": {
-          "caption_style": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Caption Style"
-          },
-          "ratio": {
-            "anyOf": [
-              {
-                "enum": [
-                  "9:16",
-                  "1:1",
-                  "16:9"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ratio"
-          },
-          "words": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/WordOut"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Words"
-          }
-        },
-        "title": "CaptionPatchIn",
-        "type": "object"
-      },
-      "CaptionStyleOut": {
-        "properties": {
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "preview": {
-            "additionalProperties": true,
-            "title": "Preview",
-            "type": "object"
-          }
-        },
-        "required": [
-          "key",
-          "label",
-          "description",
-          "preview"
-        ],
-        "title": "CaptionStyleOut",
-        "type": "object"
-      },
       "ClipOut": {
         "properties": {
           "caption_style": {
@@ -432,32 +341,6 @@
         "title": "ExportOut",
         "type": "object"
       },
-      "ExportRequestIn": {
-        "properties": {
-          "ratio": {
-            "default": "9:16",
-            "enum": [
-              "9:16",
-              "1:1",
-              "16:9"
-            ],
-            "title": "Ratio",
-            "type": "string"
-          },
-          "style": {
-            "default": "bold_pop",
-            "title": "Style",
-            "type": "string"
-          },
-          "write_srt": {
-            "default": false,
-            "title": "Write Srt",
-            "type": "boolean"
-          }
-        },
-        "title": "ExportRequestIn",
-        "type": "object"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -469,22 +352,6 @@
           }
         },
         "title": "HTTPValidationError",
-        "type": "object"
-      },
-      "JobCreateIn": {
-        "properties": {
-          "settings": {
-            "$ref": "#/components/schemas/JobSettingsIn"
-          },
-          "source_id": {
-            "title": "Source Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source_id"
-        ],
-        "title": "JobCreateIn",
         "type": "object"
       },
       "JobOut": {
@@ -1059,78 +926,6 @@
         "title": "SourceOut",
         "type": "object"
       },
-      "SystemOut": {
-        "properties": {
-          "accel": {
-            "title": "Accel",
-            "type": "string"
-          },
-          "compute_type": {
-            "title": "Compute Type",
-            "type": "string"
-          },
-          "diarization_available": {
-            "title": "Diarization Available",
-            "type": "boolean"
-          },
-          "ffmpeg_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ffmpeg Version"
-          },
-          "gpu_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gpu Name"
-          },
-          "has_libass": {
-            "title": "Has Libass",
-            "type": "boolean"
-          },
-          "nvenc_works": {
-            "title": "Nvenc Works",
-            "type": "boolean"
-          },
-          "platform": {
-            "title": "Platform",
-            "type": "string"
-          },
-          "python_version": {
-            "title": "Python Version",
-            "type": "string"
-          },
-          "ready": {
-            "title": "Ready",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ready",
-          "python_version",
-          "platform",
-          "ffmpeg_version",
-          "has_libass",
-          "nvenc_works",
-          "accel",
-          "gpu_name",
-          "compute_type",
-          "diarization_available"
-        ],
-        "title": "SystemOut",
-        "type": "object"
-      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1209,64 +1004,6 @@
         ],
         "title": "VideoCreateOut",
         "type": "object"
-      },
-      "WordOut": {
-        "properties": {
-          "end": {
-            "title": "End",
-            "type": "number"
-          },
-          "speaker": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Speaker"
-          },
-          "start": {
-            "title": "Start",
-            "type": "number"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "text",
-          "start",
-          "end"
-        ],
-        "title": "WordOut",
-        "type": "object"
-      },
-      "YouTubeIngestIn": {
-        "properties": {
-          "cookies_from_browser": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cookies From Browser"
-          },
-          "url": {
-            "title": "Url",
-            "type": "string"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "title": "YouTubeIngestIn",
-        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1283,1094 +1020,6 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/caption-styles": {
-      "get": {
-        "description": "Style presets, with enough detail for the UI to approximate them in CSS.",
-        "operationId": "caption_styles_api_caption_styles_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/CaptionStyleOut"
-                  },
-                  "title": "Response Caption Styles Api Caption Styles Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Caption Styles",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/clips/{clip_id}": {
-      "get": {
-        "operationId": "get_clip_api_clips__clip_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "clip_id",
-            "required": true,
-            "schema": {
-              "title": "Clip Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClipOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Clip",
-        "tags": [
-          "clips"
-        ]
-      },
-      "patch": {
-        "description": "Trim, retitle, or keep/discard a clip.\n\nA trim re-derives the word range from the new times, so captions stay in\nstep with the boundaries without the client having to compute indices.",
-        "operationId": "patch_clip_api_clips__clip_id__patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "clip_id",
-            "required": true,
-            "schema": {
-              "title": "Clip Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClipPatchIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClipOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Patch Clip",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/clips/{clip_id}/captions": {
-      "patch": {
-        "description": "Store word-level caption edits and style choices for a clip.",
-        "operationId": "patch_captions_api_clips__clip_id__captions_patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "clip_id",
-            "required": true,
-            "schema": {
-              "title": "Clip Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CaptionPatchIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClipOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Patch Captions",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/clips/{clip_id}/crop-path": {
-      "get": {
-        "description": "The computed crop path for a clip, so the preview can match the export.\n\nWithout this the review player can only centre-crop, which on a tracked shot\nshows different framing from the file that gets rendered \u2014 sometimes with\nthe speaker half out of frame. Reviewing framing against the wrong framing\nis worse than not previewing it at all.",
-        "operationId": "clip_crop_path_api_clips__clip_id__crop_path_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "clip_id",
-            "required": true,
-            "schema": {
-              "title": "Clip Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Clip Crop Path Api Clips  Clip Id  Crop Path Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Clip Crop Path",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/clips/{clip_id}/export": {
-      "post": {
-        "description": "Render one clip and return its download link.",
-        "operationId": "export_clip_api_clips__clip_id__export_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "clip_id",
-            "required": true,
-            "schema": {
-              "title": "Clip Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExportRequestIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExportOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Export Clip",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/clips/{clip_id}/words": {
-      "get": {
-        "description": "Words for a clip \u2014 the caption editor's source of truth.\n\nReturns the user's edited words when they exist, falling back to the\ntranscript's originals.",
-        "operationId": "clip_words_api_clips__clip_id__words_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "clip_id",
-            "required": true,
-            "schema": {
-              "title": "Clip Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/WordOut"
-                  },
-                  "title": "Response Clip Words Api Clips  Clip Id  Words Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Clip Words",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/exports/{export_id}/download": {
-      "get": {
-        "operationId": "download_export_api_exports__export_id__download_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "export_id",
-            "required": true,
-            "schema": {
-              "title": "Export Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Download Export",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/health": {
-      "get": {
-        "operationId": "health_api_health_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Health Api Health Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Health"
-      }
-    },
-    "/api/jobs": {
-      "get": {
-        "operationId": "list_jobs_api_jobs_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 25,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/JobOut"
-                  },
-                  "title": "Response List Jobs Api Jobs Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "List Jobs",
-        "tags": [
-          "jobs"
-        ]
-      },
-      "post": {
-        "operationId": "create_job_api_jobs_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/JobCreateIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Create Job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}": {
-      "get": {
-        "operationId": "get_job_api_jobs__job_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}/cancel": {
-      "post": {
-        "operationId": "cancel_job_api_jobs__job_id__cancel_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Cancel Job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}/clips": {
-      "get": {
-        "operationId": "job_clips_api_jobs__job_id__clips_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Job Clips",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}/events": {
-      "get": {
-        "description": "Stream progress for a job as Server-Sent Events.",
-        "operationId": "job_events_api_jobs__job_id__events_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "public_status",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Public Status",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Job Events",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}/media": {
-      "get": {
-        "description": "Serve the source video, so the review player can scrub the original.\n\nRange requests are handled by FileResponse, which is what makes seeking in\nthe preview player usable on a long source.",
-        "operationId": "job_media_api_jobs__job_id__media_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Job Media",
-        "tags": [
-          "clips"
-        ]
-      }
-    },
-    "/api/jobs/{job_id}/retry": {
-      "post": {
-        "description": "Requeue a failed or cancelled job.\n\nCompleted stages left their artifacts in ``work/{job_id}/``, so the retry\nresumes at the stage that failed rather than starting over.",
-        "operationId": "retry_job_api_jobs__job_id__retry_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Retry Job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/api/providers/status": {
-      "get": {
-        "description": "Live health for every provider, checked concurrently.",
-        "operationId": "providers_status_api_providers_status_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ProviderStatusOut"
-                  },
-                  "title": "Response Providers Status Api Providers Status Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Providers Status",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/settings": {
-      "get": {
-        "operationId": "get_settings_api_settings_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SettingsOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Get Settings",
-        "tags": [
-          "settings"
-        ]
-      },
-      "put": {
-        "description": "Merge a partial settings update and persist it.",
-        "operationId": "put_settings_api_settings_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SettingsIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SettingsOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Settings",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/settings/secrets": {
-      "put": {
-        "description": "Store an API key or token. Values are write-only \u2014 never read back.",
-        "operationId": "put_secret_api_settings_secrets_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SecretIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Secret",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/settings/secrets/{key}": {
-      "delete": {
-        "operationId": "delete_secret_api_settings_secrets__key__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "key",
-            "required": true,
-            "schema": {
-              "title": "Key",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Secret",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/sources": {
-      "get": {
-        "operationId": "list_sources_api_sources_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/SourceOut"
-                  },
-                  "title": "Response List Sources Api Sources Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "List Sources",
-        "tags": [
-          "sources"
-        ]
-      }
-    },
-    "/api/sources/upload": {
-      "post": {
-        "description": "Accept a media upload and register it as a source.",
-        "operationId": "upload_source_api_sources_upload_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_source_api_sources_upload_post"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SourceOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Upload Source",
-        "tags": [
-          "sources"
-        ]
-      }
-    },
-    "/api/sources/youtube": {
-      "post": {
-        "description": "Download a YouTube video and register it as a source.",
-        "operationId": "ingest_youtube_api_sources_youtube_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/YouTubeIngestIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SourceOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Ingest Youtube",
-        "tags": [
-          "sources"
-        ]
-      }
-    },
-    "/api/sources/{source_id}": {
-      "get": {
-        "operationId": "get_source_api_sources__source_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "source_id",
-            "required": true,
-            "schema": {
-              "title": "Source Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SourceOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Source",
-        "tags": [
-          "sources"
-        ]
-      }
-    },
-    "/api/system": {
-      "get": {
-        "operationId": "system_status_api_system_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SystemOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "System Status",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/system/models": {
-      "post": {
-        "description": "Download any missing ML model bundles.",
-        "operationId": "fetch_models_api_system_models_post",
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Fetch Models",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
     "/api/v1/api-keys": {
       "get": {
         "operationId": "api_keys_api_v1_api_keys_get",
@@ -2532,6 +1181,7 @@
         ]
       },
       "patch": {
+        "description": "Trim, retitle, or keep/discard a clip.\n\nA trim re-derives the word range from the new times, so captions stay in\nstep with the boundaries without the client having to compute indices.",
         "operationId": "patch_clip_api_v1_clips__clip_id__patch",
         "parameters": [
           {
@@ -2746,6 +1396,52 @@
         ]
       }
     },
+    "/api/v1/exports/{export_id}/download": {
+      "get": {
+        "description": "Download any single export (preview or final) by its id.",
+        "operationId": "download_export_api_v1_exports__export_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Export",
+        "tags": [
+          "clips"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",
@@ -2819,6 +1515,7 @@
     },
     "/api/v1/jobs/{job_id}/events": {
       "get": {
+        "description": "Stream progress for a job as Server-Sent Events.",
         "operationId": "job_events_api_v1_jobs__job_id__events_get",
         "parameters": [
           {
@@ -2862,6 +1559,54 @@
         ]
       }
     },
+    "/api/v1/jobs/{job_id}/retry": {
+      "post": {
+        "description": "Requeue a failed or cancelled job.\n\nCompleted stages left their artifacts in ``work/{job_id}/``, so the retry\nresumes at the stage that failed rather than starting over.",
+        "operationId": "retry_job_api_v1_jobs__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/v1/providers": {
       "get": {
         "operationId": "providers_api_v1_providers_get",
@@ -2892,12 +1637,19 @@
     },
     "/api/v1/providers/status": {
       "get": {
-        "operationId": "provider_status_api_v1_providers_status_get",
+        "description": "Live health for every provider, checked concurrently.",
+        "operationId": "providers_status_api_v1_providers_status_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderStatusOut"
+                  },
+                  "title": "Response Providers Status Api V1 Providers Status Get",
+                  "type": "array"
+                }
               }
             },
             "description": "Successful Response"
@@ -2908,7 +1660,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Provider Status",
+        "summary": "Providers Status",
         "tags": [
           "providers"
         ]
@@ -2940,6 +1692,7 @@
         ]
       },
       "patch": {
+        "description": "Merge a partial settings update and persist it.",
         "operationId": "patch_settings_api_v1_settings_patch",
         "requestBody": {
           "content": {
@@ -2986,6 +1739,7 @@
     },
     "/api/v1/settings/secrets": {
       "put": {
+        "description": "Store an API key or token. Values are write-only \u2014 never read back.",
         "operationId": "put_secret_api_v1_settings_secrets_put",
         "requestBody": {
           "content": {

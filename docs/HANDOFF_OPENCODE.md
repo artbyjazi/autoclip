@@ -47,8 +47,8 @@ an opportunistic schema edit.
   `cookies_file_configured`.
 - API-key creation returns the bearer once. Store it in memory or an explicitly
   user-approved secure browser mechanism; never log it.
-- Legacy `/api/*` remains only for the old UI and is deprecated. New work uses
-  `/api/v1` exclusively.
+- The deprecated `/api/*` aliases were removed after the frontend migration.
+  `/api/v1` is the only REST surface (plus `/api/docs` and `/api/openapi.json`).
 
 ## Backend-owned behavior
 
@@ -66,4 +66,4 @@ an opportunistic schema edit.
 - Dashboard, history, SSE progress, clip review, preview, render, download,
   provider/settings/API-key screens work against the frozen schema.
 - Responsive and frontend tests pass.
-- `frontend/src/api.ts` has no new calls to deprecated `/api/*` routes.
+- `frontend/src/api.ts` (the legacy client) was deleted; no `/api/*` calls remain.

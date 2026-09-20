@@ -125,3 +125,48 @@ def test_cookie_file_path_is_never_exposed_or_api_mutable(v1_client) -> None:
         json={"ingest": {"cookies_file": "/private/secret/cookies.txt"}},
     )
     assert changed.status_code == 400
+
+
+def test_legacy_aliases_are_gone(v1_client) -> None:
+    client, headers = v1_client
+
+    for path in (
+        "/api/health",
+        "/api/jobs",
+        "/api/sources",
+        "/api/settings",
+        "/api/providers/status",
+        "/api/caption-styles",
+    ):
+        assert client.get(path, headers=headers).status_code == 404
+
+
+def test_retry_requeues_failed_jobs(v1_client) -> None:
+    client, headers = v1_client
+    source = store.create_source(Source(id=new_id(), type="youtube", path="", title="x"))
+
+    assert client.post("/api/v1/jobs/missing/retry", headers=headers).status_code == 404
+
+    running = store.create_job(Job(id=new_id(), source_id=source.id, kind="analysis"))
+    assert client.post(f"/api/v1/jobs/{running.id}/retry", headers=headers).status_code == 409
+
+    failed = store.create_job(
+        Job(id=new_id(), source_id=source.id, kind="analysis", status="failed")
+    )
+    response = client.post(f"/api/v1/jobs/{failed.id}/retry", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    assert store.get_job(failed.id).status == "queued"
+
+
+def test_export_download_needs_an_export(v1_client) -> None:
+    client, headers = v1_client
+    source = store.create_source(Source(id=new_id(), type="youtube", path="", title="x"))
+    analysis = store.create_job(
+        Job(id=new_id(), source_id=source.id, kind="analysis", status="done")
+    )
+    clip = Clip(id=new_id(), job_id=analysis.id, start_s=1, end_s=31)
+    store.replace_clips(analysis.id, [clip])
+
+    assert client.get("/api/v1/exports/missing/download", headers=headers).status_code == 404
+    assert client.get(f"/api/v1/clips/{clip.id}/download", headers=headers).status_code == 404
