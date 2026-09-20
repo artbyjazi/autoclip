@@ -57,8 +57,8 @@ export function Settings() {
 
   return (
     <div className="max-w-4xl pt-14">
-      <div className="rise flex items-baseline justify-between border-b border-ink-800 pb-5">
-        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] leading-none text-ink-100">
+      <div className="rise flex items-baseline justify-between border-b border-line pb-5">
+        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] leading-none text-ink-900">
           Settings
         </h1>
         <span
@@ -84,17 +84,17 @@ export function Settings() {
               className={[
                 'block w-full border-l-2 py-3 pl-3 text-left transition-colors duration-200',
                 name === settings.active_provider
-                  ? 'border-sodium-500 bg-ink-850/60'
-                  : 'border-transparent hover:border-ink-700 hover:bg-ink-850/30',
+                  ? 'border-iris-600 bg-iris-50'
+                  : 'border-transparent hover:border-line hover:bg-paper',
               ].join(' ')}
             >
               <div className="flex items-baseline justify-between gap-4">
-                <span className="text-sm text-ink-100">{name}</span>
+                <span className="text-sm text-ink-900">{name}</span>
                 <span className="text-xs text-ink-500">
                   {settings.keys_present[name] ? 'key set' : 'no key'}
                 </span>
               </div>
-              <span className="numeric mt-1 block truncate text-xs text-ink-600">
+              <span className="numeric mt-1 block truncate text-xs text-ink-400">
                 {settings.providers[name]?.model || '—'}
               </span>
             </button>
@@ -168,14 +168,14 @@ export function Settings() {
           />
         </div>
 
-        <label className="mt-5 flex items-start gap-3 text-sm text-ink-200">
+        <label className="mt-5 flex items-start gap-3 text-sm text-ink-700">
           <input
             type="checkbox"
             checked={bool(settings.whisper, 'diarization')}
             onChange={(e) =>
               patch({ whisper: { ...settings.whisper, diarization: e.target.checked } })
             }
-            className="mt-0.5 size-4 accent-sodium-500"
+            className="mt-0.5 size-4 accent-iris-600"
           />
           <span>Identify speakers — label who is talking, and cut to them</span>
         </label>
@@ -215,7 +215,7 @@ export function Settings() {
           />
           <div>
             <span className="eyebrow">Server cookie file</span>
-            <p className="mt-2 text-sm text-ink-200">
+            <p className="mt-2 text-sm text-ink-700">
               {bool(settings.ingest, 'cookies_file_configured') ? (
                 <span className="text-signal-good">configured</span>
               ) : (
@@ -244,7 +244,7 @@ export function Settings() {
           />
         </div>
 
-        <label className="mt-5 flex items-start gap-3 text-sm text-ink-200">
+        <label className="mt-5 flex items-start gap-3 text-sm text-ink-700">
           <input
             type="checkbox"
             checked={bool(settings.export, 'prefer_hardware_encoder')}
@@ -253,17 +253,17 @@ export function Settings() {
                 export: { ...settings.export, prefer_hardware_encoder: e.target.checked },
               })
             }
-            className="mt-0.5 size-4 accent-sodium-500"
+            className="mt-0.5 size-4 accent-iris-600"
           />
           <span>Use GPU encoding when available</span>
         </label>
 
-        <label className="mt-4 flex items-center gap-3 text-sm text-ink-200">
+        <label className="mt-4 flex items-center gap-3 text-sm text-ink-700">
           <input
             type="checkbox"
             checked={bool(settings.export, 'write_srt')}
             onChange={(e) => patch({ export: { ...settings.export, write_srt: e.target.checked } })}
-            className="size-4 accent-sodium-500"
+            className="size-4 accent-iris-600"
           />
           Also write an .srt sidecar
         </label>
@@ -381,7 +381,7 @@ function Section({
 }) {
   return (
     <section className="rise mt-14">
-      <div className="border-b border-ink-800 pb-2">
+      <div className="border-b border-line pb-2">
         <h2 className="eyebrow">{title}</h2>
         {note && <p className="mt-1 text-xs text-ink-500">{note}</p>}
       </div>
@@ -392,9 +392,9 @@ function Section({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-ink-850 pb-2">
+    <div className="flex items-baseline justify-between gap-4 border-b border-line pb-2">
       <dt className="text-ink-500">{label}</dt>
-      <dd className="numeric truncate text-right text-ink-200">{value}</dd>
+      <dd className="numeric truncate text-right text-ink-700">{value}</dd>
     </div>
   )
 }
@@ -487,7 +487,7 @@ function Select({
         onChange={(e) => onChange(e.target.value)}
       >
         {options.map((option) => (
-          <option key={option} value={option} className="bg-ink-850">
+          <option key={option} value={option} className="bg-card">
             {labels[option] ?? option}
           </option>
         ))}

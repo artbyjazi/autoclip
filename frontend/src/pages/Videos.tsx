@@ -5,6 +5,12 @@ import { v1, type V1SourceOut } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
 import { formatDuration } from '../format'
 
+const STEPS = [
+  { n: '1', title: 'Paste a link', note: 'Any public YouTube video — podcasts, interviews, talks.' },
+  { n: '2', title: 'AI finds the moments', note: 'Transcription, virality scoring, face-tracked vertical reframe.' },
+  { n: '3', title: 'Preview & download', note: 'Lightweight previews first, 1080×1920 finals on demand.' },
+]
+
 export function Videos() {
   const navigate = useNavigate()
   const [url, setUrl] = useState('')
@@ -50,25 +56,29 @@ export function Videos() {
   }
 
   return (
-    <div className="pt-14">
-      <div className="rise max-w-3xl">
+    <div className="pt-10">
+      {/* Hero */}
+      <div className="rise mx-auto max-w-2xl text-center">
         <p className="eyebrow">Local · No accounts · No watermarks</p>
-        <h1 className="mt-5 font-display text-[clamp(2.75rem,7vw,5.5rem)] leading-[0.95] text-ink-100">
-          Long video in.
-          <br />
-          <span className="italic text-sodium-500">Shorts</span> out.
+        <h1 className="mt-4 font-display text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02] text-ink-900">
+          Long video in. <span className="italic text-iris-600">Shorts</span> out.
         </h1>
+        <p className="mt-4 text-[0.9375rem] leading-relaxed text-ink-500">
+          AI transcribes, scores the viral moments, tracks the speaker into vertical,
+          and burns in captions. You review, preview, and download.
+        </p>
       </div>
 
-      <section className="rise mt-16 max-w-3xl" style={{ animationDelay: '90ms' }}>
+      {/* Paste card */}
+      <div className="rise card mx-auto mt-8 max-w-2xl p-5 sm:p-6" style={{ animationDelay: '90ms' }}>
         <form onSubmit={submit}>
           <label htmlFor="url" className="eyebrow">
             Paste a YouTube link
           </label>
-          <div className="mt-3 flex items-end gap-4">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input
               id="url"
-              className="field font-display text-xl md:text-2xl"
+              className="field flex-1 text-[0.9375rem]"
               placeholder="https://youtube.com/watch?v=…"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -77,10 +87,10 @@ export function Videos() {
               disabled={busy}
             />
             <button type="submit" className="btn btn-primary shrink-0" disabled={busy || !url.trim()}>
-              {busy ? 'Queueing…' : 'Start'}
+              {busy ? 'Queueing…' : 'Get Clips'}
             </button>
           </div>
-          <div className="mt-4 flex max-w-xs items-end gap-4">
+          <div className="mt-3 flex max-w-[10rem] items-end">
             <label className="block flex-1">
               <span className="eyebrow">Max clips</span>
               <input
@@ -96,52 +106,57 @@ export function Videos() {
             </label>
           </div>
         </form>
-        <p className="mt-3 text-xs leading-relaxed text-ink-500">
-          Only download video you own or have the rights to process. Analysis ends ready for
-          review — previews and final 9:16 renders are on demand.
+        <p className="mt-3 text-xs leading-relaxed text-ink-400">
+          Only download video you own or have the rights to process.
         </p>
         {error && (
-          <div className="mt-6">
+          <div className="mt-4">
             <ErrorNote error={error} onDismiss={() => setError(null)} />
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="rise mt-24" style={{ animationDelay: '160ms' }}>
-        <div className="flex items-baseline justify-between border-b border-ink-800 pb-3">
-          <h2 className="eyebrow">Videos</h2>
-          <span className="numeric text-xs text-ink-600">{videos.length}</span>
+      {/* Steps */}
+      <div className="rise mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-3" style={{ animationDelay: '160ms' }}>
+        {STEPS.map((step) => (
+          <div key={step.n} className="card p-5">
+            <span className="numeric font-display text-3xl text-iris-600">{step.n}</span>
+            <h2 className="mt-2 text-[0.9375rem] font-semibold text-ink-900">{step.title}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-ink-500">{step.note}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* History */}
+      <section className="rise mx-auto mt-12 max-w-3xl" style={{ animationDelay: '220ms' }}>
+        <div className="flex items-baseline justify-between pb-3">
+          <h2 className="eyebrow">Recent videos</h2>
+          <span className="numeric text-xs text-ink-400">{videos.length}</span>
         </div>
         {videos.length === 0 ? (
-          <p className="py-8 text-sm text-ink-500">No videos yet — paste a link above.</p>
+          <div className="card p-8 text-center">
+            <p className="text-sm text-ink-500">No videos yet — paste a link above to start.</p>
+          </div>
         ) : (
-          <ul>
+          <ul className="grid gap-3 sm:grid-cols-2">
             {videos.map((video) => (
-              <li
-                key={video.id}
-                className="group grid grid-cols-[1fr_auto] items-baseline gap-4 border-b border-ink-850 py-4 sm:grid-cols-[1fr_7rem_10rem_5rem]"
-              >
-                <Link
-                  to={`/videos/${video.id}/clips`}
-                  className="truncate text-[0.9375rem] text-ink-200 group-hover:text-ink-100"
-                >
-                  {video.title || video.url || 'Untitled'}
+              <li key={video.id} className="card group flex items-center gap-4 p-4">
+                <Link to={`/videos/${video.id}/clips`} className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.9375rem] font-semibold text-ink-900 group-hover:text-iris-600">
+                    {video.title || video.url || 'Untitled'}
+                  </span>
+                  <span className="numeric mt-1 block text-xs text-ink-500">
+                    {formatDuration(video.duration_s)}
+                    {video.channel ? ` · ${video.channel}` : ''}
+                  </span>
                 </Link>
-                <span className="numeric hidden text-xs text-ink-500 sm:block">
-                  {formatDuration(video.duration_s)}
-                </span>
-                <span className="hidden truncate text-xs text-ink-500 sm:block">
-                  {video.channel ?? '—'}
-                </span>
-                <span className="justify-self-end">
-                  <button
-                    onClick={() => void remove(video.id)}
-                    className="btn btn-ghost text-xs"
-                    title="Delete video"
-                  >
-                    Delete
-                  </button>
-                </span>
+                <button
+                  onClick={() => void remove(video.id)}
+                  className="btn btn-quiet shrink-0 text-xs"
+                  title="Delete video"
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>

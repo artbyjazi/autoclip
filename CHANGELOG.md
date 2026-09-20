@@ -5,8 +5,13 @@ versions follow [semantic versioning](https://semver.org/) once 0.1.0 ships.
 
 ## Unreleased
 
-Everything so far. The first tagged release waits on the reframe acceptance bar
-being validated against a fixed golden video set — see
+## [0.1.0] - 2026-09-19
+
+Bearer-authenticated API v1 as the only REST surface, private Tailscale
+deployment, full Clippy frontend (videos, live SSE progress, clip review with
+scores, on-demand preview/render, providers, settings, API keys, storage),
+free-tier LLM targets, YouTube cookie ingest with JS challenge solving, and the
+§6.4 golden reframe bar green (9/9) — see
 [the README](README.md#what-has-and-hasnt-been-verified).
 
 ### Added

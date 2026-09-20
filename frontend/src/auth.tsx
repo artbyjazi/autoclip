@@ -84,16 +84,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="pt-14">
-      <div className="rise max-w-xl">
+    <div className="mx-auto max-w-xl pt-14">
+      <div className="rise card p-6 sm:p-10">
         <p className="eyebrow">Private · Bearer required</p>
-        <h1 className="mt-5 font-display text-[clamp(2rem,5vw,3.5rem)] leading-[0.95] text-ink-100">
-          Paste your <span className="italic text-sodium-500">API key</span>.
+        <h1 className="mt-4 font-display text-[clamp(2rem,5vw,3rem)] leading-[1.02] text-ink-900">
+          Paste your <span className="italic text-iris-600">API key</span>.
         </h1>
-        <p className="mt-4 text-sm leading-relaxed text-ink-400">
+        <p className="mt-4 text-sm leading-relaxed text-ink-500">
           Every <span className="numeric">/api/v1/*</span> route except health needs a Bearer
           key. Create one on the server with{' '}
-          <code className="numeric text-ink-200">clippy api-key create --name laptop</code>{' '}
+          <code className="numeric text-ink-900">clippy api-key create --name laptop</code>{' '}
           — the value is shown once. It stays in this tab&apos;s session storage, never in a
           log.
         </p>
