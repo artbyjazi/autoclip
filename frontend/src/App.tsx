@@ -40,6 +40,8 @@ function Shell() {
             <TopLink to="/" end>
               Videos
             </TopLink>
+            <TopLink to="/providers">Providers</TopLink>
+            <TopLink to="/api-keys">API keys</TopLink>
             <TopLink to="/settings">Settings</TopLink>
             <a
               href="/api/docs"

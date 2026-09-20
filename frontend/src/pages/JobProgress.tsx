@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { formatDuration } from '../api'
+import { formatDuration } from '../format'
 import { ErrorNote } from '../components/ErrorNote'
 import { useV1JobStream } from '../useV1JobStream'
 

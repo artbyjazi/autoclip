@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import { formatDuration } from '../api'
+import { formatDuration } from '../format'
 import { v1, type V1ClipOut, type V1SourceOut } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
 import { useV1JobStream } from '../useV1JobStream'

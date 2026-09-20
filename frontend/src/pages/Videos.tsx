@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { v1, type V1SourceOut } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
-import { formatDuration } from '../api'
+import { formatDuration } from '../format'
 
 export function Videos() {
   const navigate = useNavigate()

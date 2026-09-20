@@ -1,34 +1,36 @@
 import { useEffect, useState } from 'react'
 
-import { api, type ProviderStatus, type Settings as SettingsData, type SystemStatus } from '../api'
+import { v1, type V1SettingsOut, type V1StorageStatus } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
 
 const SECRET_LABELS: Record<string, string> = {
   anthropic: 'Anthropic API key',
   openai: 'OpenAI-compatible API key',
   gemini: 'Google Gemini API key',
+  groq: 'Groq API key',
+  openrouter: 'OpenRouter API key',
   huggingface_token: 'HuggingFace token',
 }
 
+const PROVIDER_NAMES = ['anthropic', 'openai', 'gemini', 'groq', 'openrouter', 'ollama']
+
 export function Settings() {
-  const [settings, setSettings] = useState<SettingsData | null>(null)
-  const [providers, setProviders] = useState<ProviderStatus[]>([])
-  const [system, setSystem] = useState<SystemStatus | null>(null)
+  const [settings, setSettings] = useState<V1SettingsOut | null>(null)
+  const [storage, setStorage] = useState<V1StorageStatus | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [saved, setSaved] = useState(false)
 
   const reload = () => {
-    void api.getSettings().then(setSettings).catch((e) => setError(e as Error))
-    void api.providerStatus().then(setProviders).catch(() => undefined)
-    void api.system().then(setSystem).catch(() => undefined)
+    v1.getSettings().then(setSettings).catch((e) => setError(e as Error))
+    v1.storage().then(setStorage).catch(() => undefined)
   }
 
   useEffect(reload, [])
 
-  const patch = async (update: Partial<SettingsData>) => {
+  const patch = async (update: Record<string, unknown>) => {
     setError(null)
     try {
-      setSettings(await api.putSettings(update))
+      setSettings(await v1.patchSettings(update))
       setSaved(true)
       setTimeout(() => setSaved(false), 1600)
     } catch (err) {
@@ -37,6 +39,21 @@ export function Settings() {
   }
 
   if (!settings) return <p className="pt-24 text-sm text-ink-500">Loading…</p>
+
+  const str = (section: Record<string, unknown>, key: string) =>
+    typeof section[key] === 'string' ? (section[key] as string) : ''
+  const num = (section: Record<string, unknown>, key: string) =>
+    typeof section[key] === 'number' ? (section[key] as number) : 0
+  const bool = (section: Record<string, unknown>, key: string) => section[key] === true
+
+  // The cookie path is server-only: the API exposes presence, never the path,
+  // and rejects any attempt to set it. Strip both keys before PATCHing ingest.
+  const patchIngest = (ingest: Record<string, unknown>) => {
+    const { cookies_file: _cf, cookies_file_configured: _cc, ...rest } = ingest
+    void _cf
+    void _cc
+    return patch({ ingest: rest })
+  }
 
   return (
     <div className="max-w-4xl pt-14">
@@ -58,41 +75,28 @@ export function Settings() {
         </div>
       )}
 
-      {settings.insecure_secret_storage && (
-        <p className="mt-6 border-l-2 border-sodium-600 pl-4 text-sm leading-relaxed text-ink-300">
-          No OS keyring is available on this machine, so API keys are stored in plain text
-          in <code className="text-ink-200">config.json</code>. On headless Linux, installing
-          a Secret Service provider or <code className="text-ink-200">keyrings.alt</code>{' '}
-          fixes this.
-        </p>
-      )}
-
-      <Section title="AI provider" note="Which model picks the clips.">
+      <Section title="AI provider" note="Which model picks the clips. Routing order and failover live under Providers.">
         <div className="space-y-1">
-          {providers.map((provider) => (
+          {PROVIDER_NAMES.map((name) => (
             <button
-              key={provider.name}
-              onClick={() => patch({ active_provider: provider.name })}
+              key={name}
+              onClick={() => patch({ active_provider: name })}
               className={[
                 'block w-full border-l-2 py-3 pl-3 text-left transition-colors duration-200',
-                provider.name === settings.active_provider
+                name === settings.active_provider
                   ? 'border-sodium-500 bg-ink-850/60'
                   : 'border-transparent hover:border-ink-700 hover:bg-ink-850/30',
               ].join(' ')}
             >
               <div className="flex items-baseline justify-between gap-4">
-                <span className="text-sm text-ink-100">{provider.name}</span>
-                <span
-                  className={`text-xs ${provider.available ? 'text-signal-good' : 'text-ink-500'}`}
-                >
-                  {provider.available ? 'reachable' : provider.detail || 'unavailable'}
+                <span className="text-sm text-ink-100">{name}</span>
+                <span className="text-xs text-ink-500">
+                  {settings.keys_present[name] ? 'key set' : 'no key'}
                 </span>
               </div>
-              {provider.models.length > 0 && (
-                <span className="numeric mt-1 block truncate text-xs text-ink-600">
-                  {provider.models.slice(0, 6).join(' · ')}
-                </span>
-              )}
+              <span className="numeric mt-1 block truncate text-xs text-ink-600">
+                {settings.providers[name]?.model || '—'}
+              </span>
             </button>
           ))}
         </div>
@@ -132,7 +136,7 @@ export function Settings() {
         </div>
       </Section>
 
-      <Section title="Keys" note="Stored in your OS keyring. Never sent anywhere but the provider.">
+      <Section title="Keys" note="Write-only. Stored in the server's owner-only secrets file, never returned by the API.">
         <div className="space-y-4">
           {Object.entries(SECRET_LABELS).map(([key, label]) => (
             <SecretField
@@ -151,14 +155,14 @@ export function Settings() {
         <div className="grid gap-5 sm:grid-cols-2">
           <Select
             label="Whisper model"
-            value={settings.whisper.model}
+            value={str(settings.whisper, 'model')}
             onChange={(value) => patch({ whisper: { ...settings.whisper, model: value } })}
             options={['tiny', 'base', 'small', 'medium', 'large-v3']}
           />
           <Field
             label="Language"
             hint="Leave empty to detect automatically."
-            value={settings.whisper.language}
+            value={str(settings.whisper, 'language')}
             placeholder="auto"
             onCommit={(value) => patch({ whisper: { ...settings.whisper, language: value } })}
           />
@@ -167,22 +171,13 @@ export function Settings() {
         <label className="mt-5 flex items-start gap-3 text-sm text-ink-200">
           <input
             type="checkbox"
-            checked={settings.whisper.diarization}
-            disabled={!system?.diarization_available}
+            checked={bool(settings.whisper, 'diarization')}
             onChange={(e) =>
               patch({ whisper: { ...settings.whisper, diarization: e.target.checked } })
             }
             className="mt-0.5 size-4 accent-sodium-500"
           />
-          <span>
-            Identify speakers
-            {!system?.diarization_available && (
-              <span className="mt-1 block text-xs text-ink-500">
-                Needs the diarization extra:{' '}
-                <code className="text-ink-300">uv pip install &apos;clippy[diarization]&apos;</code>
-              </span>
-            )}
-          </span>
+          <span>Identify speakers — label who is talking, and cut to them</span>
         </label>
       </Section>
 
@@ -190,17 +185,17 @@ export function Settings() {
         <div className="grid gap-5 sm:grid-cols-3">
           <NumberField
             label="Min length (s)"
-            value={settings.clips.min_duration_s}
+            value={num(settings.clips, 'min_duration_s')}
             onCommit={(value) => patch({ clips: { ...settings.clips, min_duration_s: value } })}
           />
           <NumberField
             label="Max length (s)"
-            value={settings.clips.max_duration_s}
+            value={num(settings.clips, 'max_duration_s')}
             onCommit={(value) => patch({ clips: { ...settings.clips, max_duration_s: value } })}
           />
           <NumberField
             label="Max clips"
-            value={settings.clips.max_clips}
+            value={num(settings.clips, 'max_clips')}
             onCommit={(value) => patch({ clips: { ...settings.clips, max_clips: value } })}
           />
         </div>
@@ -211,13 +206,26 @@ export function Settings() {
           <Select
             label="YouTube cookies from"
             hint="YouTube blocks most anonymous downloads. Sign in in that browser and close it before downloading."
-            value={settings.ingest.cookies_from_browser}
+            value={str(settings.ingest, 'cookies_from_browser')}
             onChange={(value) =>
-              patch({ ingest: { ...settings.ingest, cookies_from_browser: value } })
+              patchIngest({ ...settings.ingest, cookies_from_browser: value })
             }
             options={['', 'chrome', 'firefox', 'edge', 'brave', 'chromium', 'safari']}
             labels={{ '': 'None' }}
           />
+          <div>
+            <span className="eyebrow">Server cookie file</span>
+            <p className="mt-2 text-sm text-ink-200">
+              {bool(settings.ingest, 'cookies_file_configured') ? (
+                <span className="text-signal-good">configured</span>
+              ) : (
+                <span className="text-ink-500">not configured</span>
+              )}
+            </p>
+            <p className="mt-1.5 text-xs leading-snug text-ink-500">
+              Managed by the server operator; its path is never exposed through the API.
+            </p>
+          </div>
         </div>
       </Section>
 
@@ -225,13 +233,13 @@ export function Settings() {
         <div className="grid gap-5 sm:grid-cols-2">
           <Select
             label="Default ratio"
-            value={settings.export.ratio}
+            value={str(settings.export, 'ratio')}
             onChange={(value) => patch({ export: { ...settings.export, ratio: value } })}
             options={['9:16', '1:1', '16:9']}
           />
           <NumberField
             label="Loudness target (LUFS)"
-            value={settings.export.loudness_lufs}
+            value={num(settings.export, 'loudness_lufs')}
             onCommit={(value) => patch({ export: { ...settings.export, loudness_lufs: value } })}
           />
         </div>
@@ -239,7 +247,7 @@ export function Settings() {
         <label className="mt-5 flex items-start gap-3 text-sm text-ink-200">
           <input
             type="checkbox"
-            checked={settings.export.prefer_hardware_encoder}
+            checked={bool(settings.export, 'prefer_hardware_encoder')}
             onChange={(e) =>
               patch({
                 export: { ...settings.export, prefer_hardware_encoder: e.target.checked },
@@ -247,21 +255,13 @@ export function Settings() {
             }
             className="mt-0.5 size-4 accent-sodium-500"
           />
-          <span>
-            Use GPU encoding when available
-            {system && !system.nvenc_works && (
-              <span className="mt-1 block text-xs text-ink-500">
-                Not usable on this machine — exports will use the CPU encoder. Same quality,
-                slower.
-              </span>
-            )}
-          </span>
+          <span>Use GPU encoding when available</span>
         </label>
 
         <label className="mt-4 flex items-center gap-3 text-sm text-ink-200">
           <input
             type="checkbox"
-            checked={settings.export.write_srt}
+            checked={bool(settings.export, 'write_srt')}
             onChange={(e) => patch({ export: { ...settings.export, write_srt: e.target.checked } })}
             className="size-4 accent-sodium-500"
           />
@@ -269,22 +269,105 @@ export function Settings() {
         </label>
       </Section>
 
-      {system && (
-        <Section title="This machine">
-          <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-            <Row label="Platform" value={system.platform} />
-            <Row label="Python" value={system.python_version} />
-            <Row label="ffmpeg" value={system.ffmpeg_version ?? 'not found'} />
-            <Row label="Acceleration" value={system.accel.toUpperCase()} />
-            <Row label="Device" value={system.gpu_name ?? '—'} />
-            <Row label="Whisper compute" value={system.compute_type} />
-            <Row label="GPU encode" value={system.nvenc_works ? 'available' : 'unavailable'} />
-            <Row label="Captions" value={system.has_libass ? 'libass present' : 'libass missing'} />
-          </dl>
-        </Section>
-      )}
+      <StorageSection storage={storage} settings={settings} onPatch={patch} onError={setError} />
     </div>
   )
+}
+
+function StorageSection({
+  storage,
+  settings,
+  onPatch,
+  onError,
+}: {
+  storage: V1StorageStatus | null
+  settings: V1SettingsOut
+  onPatch: (update: Record<string, unknown>) => Promise<void>
+  onError: (error: Error) => void
+}) {
+  const [report, setReport] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const num = (key: string) =>
+    typeof settings.storage[key] === 'number' ? (settings.storage[key] as number) : 0
+
+  const cleanup = async () => {
+    setBusy(true)
+    setReport(null)
+    try {
+      const result = await v1.runCleanup()
+      const mb = (result.bytes / 1048576).toFixed(1)
+      setReport(
+        `Removed ${result.previews} previews, ${result.sources} sources, ${result.chunks} chunks — ${mb} MB reclaimed. Final exports are never deleted.`,
+      )
+    } catch (err) {
+      onError(err as Error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const gb = (bytes: number) => `${(bytes / 1073741824).toFixed(1)} GB`
+
+  return (
+    <Section
+      title="Storage"
+      note="Previews expire after 24 hours by default, sources after 7 days. Transcripts, metadata and final exports are kept."
+    >
+      <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+        <Row label="Home" value={storage?.root ?? '…'} />
+        <Row
+          label="Clippy data"
+          value={storage ? formatBytes(storage.used_bytes) : '…'}
+        />
+        <Row label="Disk free" value={storage ? gb(storage.disk_free_bytes) : '…'} />
+        <Row label="Disk total" value={storage ? gb(storage.disk_total_bytes) : '…'} />
+      </dl>
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-3">
+        <NumberField
+          label="Sources kept (days)"
+          value={num('source_retention_days')}
+          onCommit={(value) =>
+            onPatch({ storage: { ...settings.storage, source_retention_days: value } })
+          }
+        />
+        <NumberField
+          label="Previews kept (hours)"
+          value={num('preview_retention_hours')}
+          onCommit={(value) =>
+            onPatch({ storage: { ...settings.storage, preview_retention_hours: value } })
+          }
+        />
+        <NumberField
+          label="Refuse jobs below (GB)"
+          value={num('reject_new_jobs_below_gb')}
+          onCommit={(value) =>
+            onPatch({ storage: { ...settings.storage, reject_new_jobs_below_gb: value } })
+          }
+        />
+      </div>
+
+      <div className="mt-5">
+        <button onClick={() => void cleanup()} disabled={busy} className="btn btn-ghost text-sm">
+          {busy ? 'Cleaning…' : 'Run cleanup now'}
+        </button>
+        {report && <p className="mt-3 text-sm text-signal-good">{report}</p>}
+      </div>
+    </Section>
+  )
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`
 }
 
 function Section({
@@ -316,7 +399,7 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** Commits on blur rather than per keystroke, so a PUT isn't fired per letter. */
+/** Commits on blur rather than per keystroke, so a PATCH isn't fired per letter. */
 function Field({
   label,
   hint,
@@ -434,7 +517,7 @@ function SecretField({
     if (!value.trim()) return
     setBusy(true)
     try {
-      await api.putSecret(secretKey, value.trim())
+      await v1.putSecret(secretKey, value.trim())
       setValue('')
       onChanged()
     } catch (err) {
@@ -447,7 +530,7 @@ function SecretField({
   const remove = async () => {
     setBusy(true)
     try {
-      await api.deleteSecret(secretKey)
+      await v1.deleteSecret(secretKey)
       onChanged()
     } catch (err) {
       onError(err as Error)

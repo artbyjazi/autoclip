@@ -95,6 +95,71 @@ export interface V1ApiKeyOut {
   last_used_at: string | null
 }
 
+export interface V1ApiKeyCreatedOut extends V1ApiKeyOut {
+  token: string
+}
+
+export interface V1ProviderTarget {
+  id: string
+  purpose: string
+  provider: string
+  model: string
+  priority: number
+  enabled: boolean
+  health: string
+  cooldown_until: string
+  consecutive_errors: number
+  last_error: string
+  last_success: string
+  updated_at: string
+}
+
+export interface V1TargetUsage {
+  target_id: string
+  requests: number
+  successes: number
+  errors: number
+  average_latency_ms: number
+  input_tokens: number
+  output_tokens: number
+  audio_seconds: number
+}
+
+export interface V1ProviderStatus {
+  name: string
+  available: boolean
+  detail: string
+  models: string[]
+  requires_key: boolean
+  has_key: boolean
+}
+
+export interface V1SettingsOut {
+  active_provider: string
+  providers: Record<string, { model: string; base_url: string | null }>
+  whisper: Record<string, unknown>
+  clips: Record<string, unknown>
+  ingest: Record<string, unknown>
+  export: Record<string, unknown>
+  storage: Record<string, unknown>
+  insecure_secret_storage: boolean
+  keys_present: Record<string, boolean>
+}
+
+export interface V1StorageStatus {
+  root: string
+  used_bytes: number
+  disk_total_bytes: number
+  disk_free_bytes: number
+}
+
+export interface V1CleanupReport {
+  previews: number
+  sources: number
+  chunks: number
+  bytes: number
+}
+
 const TOKEN_KEY = 'clippy.v1.token'
 
 export function getToken(): string | null {
@@ -209,11 +274,11 @@ export const v1 = {
     return URL.createObjectURL(await response.blob())
   },
 
-  providers: () => v1request<unknown[]>('/api/v1/providers'),
-  providersStatus: () => v1request<unknown[]>('/api/v1/providers/status'),
-  getSettings: () => v1request<unknown>('/api/v1/settings'),
+  providers: () => v1request<{ targets: V1ProviderTarget[]; usage: V1TargetUsage[] }>('/api/v1/providers'),
+  providersStatus: () => v1request<V1ProviderStatus[]>('/api/v1/providers/status'),
+  getSettings: () => v1request<V1SettingsOut>('/api/v1/settings'),
   patchSettings: (patch: Record<string, unknown>) =>
-    v1request<unknown>('/api/v1/settings', {
+    v1request<V1SettingsOut>('/api/v1/settings', {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
@@ -226,8 +291,14 @@ export const v1 = {
     v1request<void>(`/api/v1/settings/secrets/${key}`, { method: 'DELETE' }),
 
   listApiKeys: () => v1request<V1ApiKeyOut[]>('/api/v1/api-keys'),
+  createApiKey: (name: string) =>
+    v1request<V1ApiKeyCreatedOut>('/api/v1/api-keys', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
   deleteApiKey: (id: string) =>
     v1request<void>(`/api/v1/api-keys/${id}`, { method: 'DELETE' }),
 
-  storage: () => v1request<unknown>('/api/v1/storage'),
+  storage: () => v1request<V1StorageStatus>('/api/v1/storage'),
+  runCleanup: () => v1request<V1CleanupReport>('/api/v1/storage/cleanup', { method: 'POST' }),
 }
