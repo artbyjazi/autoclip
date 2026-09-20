@@ -56,19 +56,15 @@ jobs:
         # "libass": not every build prints its configure line, and Homebrew's
         # does not. The filter is what the export stage actually calls.
         #
-        # The output is captured into a variable rather than piped, because
-        # `grep -q` exits on its first match and SIGPIPEs ffmpeg — and GitHub
-        # runs these steps with `set -o pipefail`, which turns that into a
-        # failed step even when the filter is present.
+        # Matches the filter-name column exactly with awk: some builds render
+        # the flags column as "..." instead of spaces, which broke a
+        # whitespace-anchored grep even though the filter was present.
         run: |
           ffmpeg -hide_banner -version | head -n 1
-          filters="$(ffmpeg -hide_banner -filters 2>/dev/null || true)"
-          if printf '%s\n' "$filters" | grep -qE '[[:space:]]ass[[:space:]]'; then
+          if ffmpeg -hide_banner -filters 2>/dev/null | awk '$2 == "ass" { found = 1 } END { exit !found }'; then
             echo "ass filter present"
           else
             echo "::error::This ffmpeg has no 'ass' filter; captions cannot be burned in."
-            echo "--- subtitle-related filters this build does have ---"
-            printf '%s\n' "$filters" | grep -iE 'subtitle|ass|text' || echo "(none)"
             exit 1
           fi
 
