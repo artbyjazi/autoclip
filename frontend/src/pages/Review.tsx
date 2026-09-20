@@ -1,175 +1,116 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import {
-  api,
-  formatBytes,
-  formatDuration,
-  type CaptionStyle,
-  type Clip,
-  type CropPath,
-  type Job,
-  type Word,
-} from '../api'
-import { CaptionEditor } from '../components/CaptionEditor'
-import { ClipPlayer } from '../components/ClipPlayer'
+import { formatDuration } from '../format'
+import { v1, type V1ClipOut, type V1SourceOut } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
-import { TrimBar } from '../components/TrimBar'
+import { useV1JobStream } from '../useV1JobStream'
 
-const RATIOS = ['9:16', '1:1', '16:9'] as const
+const STYLES = ['bold', 'karaoke', 'clean', 'hormozi', 'mrbeast'] as const
+
+const BREAKDOWN_LABELS: Record<string, string> = {
+  hook: 'Hook',
+  retention: 'Retention',
+  clarity: 'Clarity',
+  insight: 'Insight',
+  emotion: 'Emotion',
+  surprise: 'Surprise',
+  energy: 'Energy',
+  standalone_context: 'Standalone',
+  complete_thought: 'Complete thought',
+  payoff: 'Payoff',
+}
 
 export function Review() {
-  const { jobId } = useParams()
-  const [job, setJob] = useState<Job | null>(null)
-  const [clips, setClips] = useState<Clip[]>([])
-  const [styles, setStyles] = useState<CaptionStyle[]>([])
+  const { videoId } = useParams()
+  const [video, setVideo] = useState<V1SourceOut | null>(null)
+  const [clips, setClips] = useState<V1ClipOut[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [words, setWords] = useState<Word[]>([])
-  const [cropPath, setCropPath] = useState<CropPath | null>(null)
-  const [wordsDirty, setWordsDirty] = useState(false)
-  const [savingWords, setSavingWords] = useState(false)
-  const [exporting, setExporting] = useState<Set<string>>(new Set())
   const [error, setError] = useState<Error | null>(null)
+  const [previewJobId, setPreviewJobId] = useState<string | null>(null)
+  const [renderJobId, setRenderJobId] = useState<string | null>(null)
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  const [mediaBusy, setMediaBusy] = useState(false)
 
   useEffect(() => {
-    if (!jobId) return
-    void Promise.all([api.getJob(jobId), api.listClips(jobId), api.captionStyles()])
-      .then(([loadedJob, loadedClips, loadedStyles]) => {
-        setJob(loadedJob)
-        setClips(loadedClips)
-        setStyles(loadedStyles)
-        setSelectedId((current) => current ?? loadedClips[0]?.id ?? null)
+    if (!videoId) return
+    void Promise.all([v1.getVideo(videoId), v1.listClips(videoId)])
+      .then(([loadedVideo, loadedClips]) => {
+        setVideo(loadedVideo)
+        const ranked = [...loadedClips].sort((a, b) => b.score - a.score)
+        setClips(ranked)
+        setSelectedId((current) => current ?? ranked[0]?.id ?? null)
       })
       .catch((err) => setError(err as Error))
-  }, [jobId])
+  }, [videoId])
+
+  // Revoke blob URLs when replaced or unmounted.
+  useEffect(() => () => {
+    if (mediaUrl) URL.revokeObjectURL(mediaUrl)
+  }, [mediaUrl])
 
   const selected = useMemo(
     () => clips.find((clip) => clip.id === selectedId) ?? null,
     [clips, selectedId],
   )
 
-  useEffect(() => {
-    if (!selected) return
-    setWordsDirty(false)
-    api
-      .getClipWords(selected.id)
-      .then(setWords)
-      .catch(() => setWords([]))
-    // 404 is expected for audio-only sources and jobs that never reframed; the
-    // player falls back to a centre crop, matching what the renderer does.
-    api
-      .getCropPath(selected.id)
-      .then(setCropPath)
-      .catch(() => setCropPath(null))
-  }, [selected?.id])
-
-  const patchClip = useCallback((updated: Clip) => {
+  const patchClip = useCallback((updated: V1ClipOut) => {
     setClips((current) => current.map((clip) => (clip.id === updated.id ? updated : clip)))
   }, [])
 
-  const setStatus = async (clip: Clip, status: Clip['status']) => {
-    try {
-      patchClip(await api.patchClip(clip.id, { status }))
-    } catch (err) {
-      setError(err as Error)
-    }
-  }
+  const refreshClip = useCallback(
+    async (id: string) => {
+      patchClip(await v1.getClip(id))
+    },
+    [patchClip],
+  )
 
-  const commitTrim = async (start: number, end: number) => {
+  const loadMedia = useCallback(async () => {
     if (!selected) return
-    try {
-      patchClip(await api.patchClip(selected.id, { start_s: start, end_s: end }))
-      setWords(await api.getClipWords(selected.id))
-    } catch (err) {
-      setError(err as Error)
-    }
-  }
-
-  const saveWords = async () => {
-    if (!selected) return
-    setSavingWords(true)
-    try {
-      patchClip(await api.patchCaptions(selected.id, { words }))
-      setWordsDirty(false)
-    } catch (err) {
-      setError(err as Error)
-    } finally {
-      setSavingWords(false)
-    }
-  }
-
-  const setStyle = async (clip: Clip, styleKey: string) => {
-    try {
-      patchClip(await api.patchCaptions(clip.id, { caption_style: styleKey }))
-    } catch (err) {
-      setError(err as Error)
-    }
-  }
-
-  const setRatio = async (clip: Clip, ratio: string) => {
-    try {
-      patchClip(await api.patchCaptions(clip.id, { ratio }))
-    } catch (err) {
-      setError(err as Error)
-    }
-  }
-
-  const exportClip = async (clip: Clip) => {
-    setExporting((current) => new Set(current).add(clip.id))
+    setMediaBusy(true)
     setError(null)
     try {
-      await api.exportClip(clip.id, clip.ratio, clip.caption_style)
-      patchClip(await api.getClip(clip.id))
+      const url = await v1.downloadBlob(selected.id)
+      setMediaUrl((current) => {
+        if (current) URL.revokeObjectURL(current)
+        return url
+      })
     } catch (err) {
       setError(err as Error)
     } finally {
-      setExporting((current) => {
-        const next = new Set(current)
-        next.delete(clip.id)
-        return next
-      })
+      setMediaBusy(false)
     }
-  }
-
-  const exportKept = async () => {
-    const targets = clips.filter((clip) => clip.status === 'kept')
-    for (const clip of targets) await exportClip(clip)
-  }
-
-  const keptCount = clips.filter((clip) => clip.status === 'kept').length
-  const activeStyle = styles.find((style) => style.key === selected?.caption_style)
+  }, [selected])
 
   if (error && clips.length === 0) {
     return (
-      <div className="max-w-3xl pt-24">
-        <ErrorNote error={error} />
+      <div className="pt-24">
+        <ErrorNote error={error} onDismiss={() => setError(null)} />
+        <p className="mt-4 text-sm text-ink-500">
+          <Link to="/" className="text-sodium-500 underline underline-offset-4">
+            Back to videos
+          </Link>
+        </p>
       </div>
     )
   }
 
-  if (!job) return <p className="pt-24 text-sm text-ink-500">Loading…</p>
-
   return (
-    <div className="pt-10">
-      <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-ink-800 pb-5">
-        <div className="min-w-0">
-          <Link to="/" className="eyebrow transition-colors hover:text-sodium-500">
-            ← All jobs
-          </Link>
-          <h1 className="mt-2 max-w-2xl truncate font-display text-[clamp(1.5rem,3vw,2.25rem)] leading-tight text-ink-100">
-            {job.source?.title || 'Untitled'}
-          </h1>
-        </div>
-
-        <div className="flex items-baseline gap-6">
-          <span className="numeric text-xs text-ink-500">
-            {clips.length} clips · {keptCount} kept
-          </span>
-          <button onClick={exportKept} disabled={keptCount === 0} className="btn btn-primary">
-            Export kept
-          </button>
-        </div>
-      </div>
+    <div className="pt-14">
+      <p className="eyebrow">
+        <Link to="/" className="hover:text-ink-200">
+          Videos
+        </Link>{' '}
+        / Review
+      </p>
+      <h1 className="mt-2 max-w-3xl truncate font-display text-[clamp(1.75rem,4vw,3rem)] leading-tight text-ink-100">
+        {video?.title || 'Loading…'}
+      </h1>
+      {video && (
+        <p className="numeric mt-2 text-xs text-ink-500">
+          {formatDuration(video.duration_s)} · {video.channel ?? ''} · {clips.length} clips
+        </p>
+      )}
 
       {error && (
         <div className="mt-6 max-w-3xl">
@@ -177,262 +118,324 @@ export function Review() {
         </div>
       )}
 
-      {clips.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="mt-8 grid gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,26rem)_minmax(0,1fr)]">
-          {/* Ranked list */}
-          <section className="lg:max-h-[76vh] lg:overflow-y-auto lg:pr-1">
-            <p className="eyebrow border-b border-ink-800 pb-2">Ranked</p>
-            <ul>
-              {clips.map((clip, index) => (
-                <li key={clip.id}>
-                  <ClipRow
-                    clip={clip}
-                    index={index}
-                    selected={clip.id === selectedId}
-                    onSelect={() => setSelectedId(clip.id)}
-                    onKeep={() =>
-                      setStatus(clip, clip.status === 'kept' ? 'candidate' : 'kept')
-                    }
-                    onDiscard={() =>
-                      setStatus(clip, clip.status === 'discarded' ? 'candidate' : 'discarded')
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Player + trim */}
-          <section className="space-y-8">
-            {selected && jobId && (
-              <>
-                <ClipPlayer
-                  src={api.mediaUrl(jobId)}
-                  startS={selected.start_s}
-                  endS={selected.end_s}
-                  words={words}
-                  style={activeStyle}
-                  ratio={selected.ratio}
-                  cropPath={cropPath}
-                />
-                <TrimBar
-                  words={words}
-                  startS={selected.start_s}
-                  endS={selected.end_s}
-                  originalStart={selected.start_s}
-                  originalEnd={selected.end_s}
-                  onCommit={commitTrim}
-                />
-              </>
-            )}
-          </section>
-
-          {/* Editor + style */}
-          <section className="space-y-10">
-            {selected && (
-              <>
-                <div>
-                  <p className="eyebrow">Why this clip</p>
-                  <p className="mt-2 max-w-prose text-[0.9375rem] leading-relaxed text-ink-300">
-                    {selected.reason || 'No rationale returned for this clip.'}
-                  </p>
-                  {selected.hook && (
-                    <p className="mt-3 border-l-2 border-ink-700 pl-3 font-display text-lg italic text-ink-200">
-                      “{selected.hook}”
-                    </p>
-                  )}
-                </div>
-
-                <CaptionEditor
-                  words={words}
-                  onChange={(next) => {
-                    setWords(next)
-                    setWordsDirty(true)
+      <div className="mt-10 grid gap-x-12 gap-y-10 lg:grid-cols-[1fr_1.4fr]">
+        {/* Ranked list */}
+        <section>
+          <h2 className="eyebrow">Clips</h2>
+          <ul className="mt-3">
+            {clips.map((clip) => (
+              <li key={clip.id}>
+                <button
+                  onClick={() => {
+                    setSelectedId(clip.id)
+                    setPreviewJobId(null)
+                    setRenderJobId(null)
                   }}
-                  onSave={saveWords}
-                  saving={savingWords}
-                  dirty={wordsDirty}
-                />
-
-                <div>
-                  <p className="eyebrow border-b border-ink-800 pb-2">Caption style</p>
-                  <div className="mt-3 space-y-1">
-                    {styles.map((style) => (
-                      <button
-                        key={style.key}
-                        onClick={() => setStyle(selected, style.key)}
-                        className={[
-                          'block w-full border-l-2 py-2 pl-3 text-left transition-colors duration-200',
-                          style.key === selected.caption_style
-                            ? 'border-sodium-500 bg-ink-850/60'
-                            : 'border-transparent hover:border-ink-700 hover:bg-ink-850/30',
-                        ].join(' ')}
-                      >
-                        <span className="text-sm text-ink-100">{style.label}</span>
-                        <span className="mt-0.5 block text-xs leading-snug text-ink-500">
-                          {style.description}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="eyebrow border-b border-ink-800 pb-2">Aspect ratio</p>
-                  <div className="mt-3 flex gap-2">
-                    {RATIOS.map((ratio) => (
-                      <button
-                        key={ratio}
-                        onClick={() => setRatio(selected, ratio)}
-                        className={[
-                          'numeric btn',
-                          ratio === selected.ratio ? 'btn-primary' : 'btn-ghost',
-                        ].join(' ')}
-                      >
-                        {ratio}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-ink-800 pt-6">
-                  <button
-                    onClick={() => exportClip(selected)}
-                    disabled={exporting.has(selected.id)}
-                    className="btn btn-primary w-full"
-                  >
-                    {exporting.has(selected.id) ? 'Rendering…' : 'Export this clip'}
-                  </button>
-
-                  {selected.exports.length > 0 && (
-                    <ul className="mt-4 space-y-2">
-                      {selected.exports.map((record) => (
-                        <li
-                          key={record.id}
-                          className="flex items-baseline justify-between gap-3 text-xs"
-                        >
-                          <a
-                            href={record.download_url}
-                            download
-                            className="truncate text-sodium-500 underline underline-offset-4"
-                          >
-                            {record.ratio} · {record.style}
-                          </a>
-                          <span className="numeric shrink-0 text-ink-600">
-                            {formatBytes(record.size_bytes)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
-          </section>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ClipRow({
-  clip,
-  index,
-  selected,
-  onSelect,
-  onKeep,
-  onDiscard,
-}: {
-  clip: Clip
-  index: number
-  selected: boolean
-  onSelect: () => void
-  onKeep: () => void
-  onDiscard: () => void
-}) {
-  return (
-    <div
-      className={[
-        'rise group grid cursor-pointer grid-cols-[2.25rem_1fr] gap-x-3 border-b border-ink-850 py-3 pl-2 transition-colors duration-200',
-        selected ? 'bg-ink-850/70' : 'hover:bg-ink-850/35',
-        clip.status === 'discarded' ? 'opacity-40' : '',
-      ].join(' ')}
-      style={{ animationDelay: `${Math.min(index, 10) * 35}ms` }}
-      onClick={onSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onSelect()
-      }}
-    >
-      {/* The score is the thing you scan by, so it gets the display face. */}
-      <span
-        className={[
-          'numeric self-start font-display text-2xl leading-none',
-          clip.score >= 85 ? 'text-sodium-500' : selected ? 'text-ink-200' : 'text-ink-500',
-        ].join(' ')}
-      >
-        {clip.score}
-      </span>
-
-      <div className="min-w-0">
-        <p className="truncate text-[0.9375rem] leading-snug text-ink-100">
-          {clip.title || 'Untitled clip'}
-        </p>
-        <div className="mt-1 flex items-baseline gap-3">
-          <span className="numeric text-xs text-ink-500">{formatDuration(clip.duration_s)}</span>
-          {clip.user_trimmed && <span className="text-xs text-ink-600">trimmed</span>}
-          {clip.exports.length > 0 && (
-            <span className="text-xs text-signal-good">exported</span>
+                  className={[
+                    'grid w-full grid-cols-[3rem_1fr_auto] items-baseline gap-3 border-b border-ink-850 py-3 text-left transition-colors duration-200',
+                    clip.id === selectedId ? 'bg-ink-850/40' : 'hover:bg-ink-850/40',
+                  ].join(' ')}
+                >
+                  <span className="numeric pl-2 text-2xl text-sodium-500">{clip.score}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[0.9375rem] text-ink-100">
+                      {clip.title}
+                    </span>
+                    <span className="numeric block text-xs text-ink-500">
+                      {formatDuration(clip.start_s)}–{formatDuration(clip.end_s)} · {clip.status}
+                      {clip.degraded ? ' · degraded' : ''}
+                    </span>
+                  </span>
+                  <span className="numeric pr-2 text-xs text-ink-500">#{clip.rank}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {clips.length === 0 && (
+            <p className="py-8 text-sm text-ink-500">
+              No clips yet — the analysis may still be running.
+            </p>
           )}
+        </section>
 
-          {/* Secondary actions appear on hover or when the row is current —
-              progressive disclosure keeps the scan column clean. */}
-          <span
-            className={[
-              'ml-auto flex gap-3 pr-2 transition-opacity duration-200',
-              selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-            ].join(' ')}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onKeep()
+        {/* Detail */}
+        {selected && (
+          <section>
+            <ClipDetail
+              clip={selected}
+              onChanged={patchClip}
+              onError={setError}
+              previewJobId={previewJobId}
+              renderJobId={renderJobId}
+              onPreview={(jobId) => {
+                setPreviewJobId(jobId)
+                setRenderJobId(null)
               }}
-              className={`text-xs ${clip.status === 'kept' ? 'text-signal-good' : 'text-ink-400 hover:text-ink-100'}`}
-            >
-              {clip.status === 'kept' ? 'kept' : 'keep'}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDiscard()
+              onRender={(jobId) => {
+                setRenderJobId(jobId)
+                setPreviewJobId(null)
               }}
-              className="text-xs text-ink-400 hover:text-signal-bad"
-            >
-              {clip.status === 'discarded' ? 'undo' : 'drop'}
-            </button>
-          </span>
-        </div>
+              onPreviewDone={() => void refreshClip(selected.id)}
+              onRenderDone={() => void refreshClip(selected.id)}
+              mediaUrl={mediaUrl}
+              mediaBusy={mediaBusy}
+              onLoadMedia={() => void loadMedia()}
+            />
+          </section>
+        )}
       </div>
     </div>
   )
 }
 
-function EmptyState() {
+function ClipDetail({
+  clip,
+  onChanged,
+  onError,
+  previewJobId,
+  renderJobId,
+  onPreview,
+  onRender,
+  onPreviewDone,
+  onRenderDone,
+  mediaUrl,
+  mediaBusy,
+  onLoadMedia,
+}: {
+  clip: V1ClipOut
+  onChanged: (clip: V1ClipOut) => void
+  onError: (err: Error) => void
+  previewJobId: string | null
+  renderJobId: string | null
+  onPreview: (jobId: string) => void
+  onRender: (jobId: string) => void
+  onPreviewDone: () => void
+  onRenderDone: () => void
+  mediaUrl: string | null
+  mediaBusy: boolean
+  onLoadMedia: () => void
+}) {
+  const [title, setTitle] = useState(clip.title)
+  const [start, setStart] = useState(String(Math.round(clip.start_s * 100) / 100))
+  const [end, setEnd] = useState(String(Math.round(clip.end_s * 100) / 100))
+  const [style, setStyle] = useState(clip.caption_style || 'bold')
+  const [busy, setBusy] = useState<string | null>(null)
+
+  useEffect(() => {
+    setTitle(clip.title)
+    setStart(String(Math.round(clip.start_s * 100) / 100))
+    setEnd(String(Math.round(clip.end_s * 100) / 100))
+    setStyle(clip.caption_style || 'bold')
+  }, [clip.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const run = async (kind: string, fn: () => Promise<unknown>) => {
+    setBusy(kind)
+    try {
+      await fn()
+    } catch (err) {
+      onError(err as Error)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const saveMeta = () =>
+    run('meta', async () => {
+      const start_s = Number(start)
+      const end_s = Number(end)
+      if (!Number.isFinite(start_s) || !Number.isFinite(end_s) || end_s <= start_s) {
+        throw new Error('Trim range is invalid: end must be after start.')
+      }
+      onChanged(await v1.patchClip(clip.id, { title, start_s, end_s }))
+    })
+
+  const setStatus = (status: string) =>
+    run('status', async () => {
+      onChanged(await v1.patchClip(clip.id, { status }))
+    })
+
+  const preview = () =>
+    run('preview', async () => {
+      const job = await v1.previewClip(clip.id, STYLES.includes(style as (typeof STYLES)[number]) ? style : 'bold')
+      onPreview(job.id)
+    })
+
+  const render = () =>
+    run('render', async () => {
+      const job = await v1.renderClip(clip.id)
+      onRender(job.id)
+    })
+
+  const breakdown = Object.entries(clip.score_breakdown ?? {})
+
   return (
-    <div className="max-w-xl pt-20">
-      <h2 className="font-display text-3xl text-ink-200">No clips came back.</h2>
-      <p className="mt-4 text-sm leading-relaxed text-ink-400">
-        The model found nothing self-contained enough to stand alone — which is a real
-        answer for some source material, not necessarily a failure.
-      </p>
-      <p className="mt-3 text-sm leading-relaxed text-ink-400">
-        If you expected clips, try a larger provider model, or widen the length range so
-        shorter moments qualify.
-      </p>
+    <div>
+      <div className="flex flex-wrap items-baseline gap-3">
+        <span className="numeric font-display text-5xl leading-none text-sodium-500">
+          {clip.score}
+        </span>
+        <div className="flex flex-wrap gap-2 text-xs">
+          {clip.degraded && (
+            <span className="border border-sodium-600 px-2 py-0.5 text-sodium-500" title="All LLM targets failed; heuristic fallback">
+              degraded
+            </span>
+          )}
+          {clip.provider_target && (
+            <span className="numeric border border-ink-700 px-2 py-0.5 text-ink-400">
+              {clip.provider_target}
+            </span>
+          )}
+          <span className="border border-ink-700 px-2 py-0.5 text-ink-400">{clip.status}</span>
+          <span className="numeric border border-ink-700 px-2 py-0.5 text-ink-400">
+            {formatDuration(clip.start_s)}–{formatDuration(clip.end_s)}
+          </span>
+        </div>
+      </div>
+
+      <p className="mt-4 text-[0.9375rem] italic text-ink-200">“{clip.hook}”</p>
+      <p className="mt-2 text-sm leading-relaxed text-ink-400">{clip.reason}</p>
+
+      {breakdown.length > 0 && (
+        <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+          {breakdown.map(([key, value]) => (
+            <div key={key} className="flex items-baseline justify-between gap-2 border-b border-ink-850 py-1.5">
+              <dt className="text-xs text-ink-500">{BREAKDOWN_LABELS[key] ?? key}</dt>
+              <dd className="numeric text-sm text-ink-200">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {/* Title + trim */}
+      <div className="mt-8 grid gap-4 sm:grid-cols-[1fr_7rem_7rem_auto]">
+        <label className="block">
+          <span className="eyebrow">Title</span>
+          <input
+            className="field mt-1 text-sm"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="eyebrow">Start (s)</span>
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            className="field numeric mt-1 text-sm"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="eyebrow">End (s)</span>
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            className="field numeric mt-1 text-sm"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+          />
+        </label>
+        <div className="flex items-end">
+          <button onClick={() => void saveMeta()} disabled={busy !== null} className="btn btn-ghost text-sm">
+            {busy === 'meta' ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {/* Keep / discard */}
+      <div className="mt-4 flex gap-3">
+        <button
+          onClick={() => void setStatus('kept')}
+          disabled={busy !== null}
+          className="btn btn-ghost text-sm"
+        >
+          Keep
+        </button>
+        <button
+          onClick={() => void setStatus('discarded')}
+          disabled={busy !== null}
+          className="btn btn-ghost text-sm"
+        >
+          Discard
+        </button>
+      </div>
+
+      {/* Preview / render */}
+      <div className="mt-8 border-t border-ink-800 pt-6">
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="block">
+            <span className="eyebrow">Caption style</span>
+            <select value={style} onChange={(e) => setStyle(e.target.value)} className="field mt-1 cursor-pointer text-sm">
+              {STYLES.map((s) => (
+                <option key={s} value={s} className="bg-ink-850">
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            onClick={() => void preview()}
+            disabled={busy !== null}
+            className="btn btn-ghost text-sm"
+            title="540×960 lightweight H.264"
+          >
+            {busy === 'preview' ? 'Queueing…' : 'Preview'}
+          </button>
+          <button
+            onClick={() => void render()}
+            disabled={busy !== null}
+            className="btn btn-primary text-sm"
+            title="1080×1920 final"
+          >
+            {busy === 'render' ? 'Queueing…' : 'Render final'}
+          </button>
+          <button
+            onClick={onLoadMedia}
+            disabled={mediaBusy}
+            className="btn btn-ghost text-sm"
+            title="Fetch the final MP4 with your Bearer key"
+          >
+            {mediaBusy ? 'Loading…' : mediaUrl ? 'Reload video' : 'Load video'}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-ink-500">
+          Preview is 540×960 ultrafast; final is 1080×1920, always 9:16.
+        </p>
+
+        {previewJobId && (
+          <JobFollow jobId={previewJobId} label="Preview" onDone={onPreviewDone} />
+        )}
+        {renderJobId && (
+          <JobFollow jobId={renderJobId} label="Render" onDone={onRenderDone} />
+        )}
+
+        {mediaUrl && (
+          <video key={mediaUrl} controls playsInline src={mediaUrl} className="mt-6 max-h-[70vh] w-full max-w-sm bg-black" />
+        )}
+      </div>
     </div>
+  )
+}
+
+/** Follows one preview/render job inline until it reaches a terminal state. */
+function JobFollow({ jobId, label, onDone }: { jobId: string; label: string; onDone: () => void }) {
+  const { job, progress } = useV1JobStream(jobId)
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    if (job && ['completed', 'failed', 'cancelled'].includes(job.status) && !firedRef.current) {
+      firedRef.current = true
+      if (job.status === 'completed') onDone()
+    }
+  }, [job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const percent = Math.round(((progress?.overall ?? job?.progress) ?? 0) * 100)
+  return (
+    <p className="numeric mt-3 text-xs text-ink-400">
+      {label}: {job?.status ?? 'queued'} · {percent}%{job?.error ? ` · ${job.error}` : ''}
+    </p>
   )
 }
