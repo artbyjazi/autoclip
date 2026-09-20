@@ -259,6 +259,20 @@ export const v1 = {
     v1request<V1JobOut>(`/api/v1/clips/${id}/render`, { method: 'POST' }),
   downloadUrl: (id: string) => `/api/v1/clips/${id}/download`,
 
+  /** Fetch any single export (preview or final) with Bearer auth. */
+  exportBlob: async (exportId: string): Promise<string> => {
+    const token = getToken()
+    const response = await fetch(`/api/v1/exports/${exportId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (response.status === 401) {
+      setToken(null)
+      window.dispatchEvent(new Event('clippy:unauthorized'))
+      throw new V1ApiError('Missing or invalid API key.', 401)
+    }
+    if (!response.ok) throw new V1ApiError(`${response.status} ${response.statusText}`, response.status)
+    return URL.createObjectURL(await response.blob())
+  },
   /** Fetch the final MP4 with Bearer auth and return an object URL. */
   downloadBlob: async (id: string): Promise<string> => {
     const token = getToken()

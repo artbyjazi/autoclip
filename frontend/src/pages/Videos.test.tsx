@@ -59,7 +59,7 @@ describe('Videos', () => {
 
     renderVideos()
     await waitFor(() => expect(screen.getByText('Test Video')).toBeTruthy())
-    expect(screen.getByText('Test Channel')).toBeTruthy()
+    expect(screen.getAllByText((_, el) => el?.textContent?.includes('Test Channel') ?? false).length).toBeGreaterThanOrEqual(1)
   })
 
   it('creates a video and navigates to its job', async () => {
@@ -81,7 +81,7 @@ describe('Videos', () => {
     fireEvent.change(screen.getByPlaceholderText(/youtube\.com\/watch/i), {
       target: { value: 'https://youtube.com/watch?v=abc' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Get Clips' }))
 
     await waitFor(() => expect(screen.getByText('navigated to job job-9')).toBeTruthy())
   })

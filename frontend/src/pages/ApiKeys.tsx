@@ -56,8 +56,8 @@ export function ApiKeys() {
 
   return (
     <div className="max-w-3xl pt-14">
-      <div className="rise border-b border-ink-800 pb-5">
-        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] leading-none text-ink-100">
+      <div className="rise border-b border-line pb-5">
+        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] leading-none text-ink-900">
           API keys
         </h1>
         <p className="mt-2 text-xs text-ink-500">
@@ -73,9 +73,9 @@ export function ApiKeys() {
       )}
 
       {created && (
-        <div className="rise mt-6 border border-sodium-600 p-4">
+        <div className="rise mt-6 border border-iris-600 p-4">
           <p className="eyebrow">New key — copy it now</p>
-          <p className="numeric mt-2 break-all text-sm text-ink-100">{created.token}</p>
+          <p className="numeric mt-2 break-all text-sm text-ink-900">{created.token}</p>
           <div className="mt-3 flex gap-3">
             <button onClick={() => void copy()} className="btn btn-ghost text-sm">
               {copied ? 'Copied' : 'Copy'}
@@ -110,9 +110,9 @@ export function ApiKeys() {
       </form>
 
       <section className="rise mt-12" style={{ animationDelay: '160ms' }}>
-        <div className="flex items-baseline justify-between border-b border-ink-800 pb-3">
+        <div className="flex items-baseline justify-between border-b border-line pb-3">
           <h2 className="eyebrow">Active keys</h2>
-          <span className="numeric text-xs text-ink-600">{keys.length}</span>
+          <span className="numeric text-xs text-ink-400">{keys.length}</span>
         </div>
         {keys.length === 0 ? (
           <p className="py-8 text-sm text-ink-500">No keys yet.</p>
@@ -121,11 +121,11 @@ export function ApiKeys() {
             {keys.map((key) => (
               <li
                 key={key.id}
-                className="grid grid-cols-[1fr_auto] items-baseline gap-4 border-b border-ink-850 py-4 sm:grid-cols-[1fr_8rem_9rem_5rem]"
+                className="grid grid-cols-[1fr_auto] items-baseline gap-4 border-b border-line py-4 sm:grid-cols-[1fr_8rem_9rem_5rem]"
               >
-                <span className="truncate text-[0.9375rem] text-ink-200">
+                <span className="truncate text-[0.9375rem] text-ink-700">
                   {key.name}
-                  <span className="numeric ml-3 text-xs text-ink-600">{key.prefix}…</span>
+                  <span className="numeric ml-3 text-xs text-ink-400">{key.prefix}…</span>
                 </span>
                 <span className="numeric hidden text-xs text-ink-500 sm:block">
                   {new Date(key.created_at).toLocaleDateString()}

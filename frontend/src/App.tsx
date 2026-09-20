@@ -5,10 +5,7 @@ import { v1 } from './api-v1'
 import { TokenProvider, useToken } from './auth'
 
 /**
- * Application shell.
- *
- * A masthead rather than a sidebar: this is a small set of screens, and a
- * persistent nav rail would spend a fifth of the width restating that.
+ * Application shell: white masthead, product nav, health badge.
  */
 export function App() {
   return (
@@ -27,16 +24,16 @@ function Shell() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-ink-900">
-      <header className="border-b border-ink-800">
-        <div className="mx-auto flex max-w-[1600px] items-baseline gap-8 px-6 py-4 lg:px-10">
-          <NavLink to="/" className="group flex items-baseline gap-2.5">
-            <span className="font-display text-2xl leading-none text-ink-100">
+    <div className="min-h-screen bg-paper">
+      <header className="sticky top-0 z-10 border-b border-line bg-card/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1400px] items-center gap-8 px-6 py-3.5 lg:px-10">
+          <NavLink to="/" className="flex items-baseline gap-2">
+            <span className="font-display text-2xl leading-none text-ink-900">
               Clippy
             </span>
           </NavLink>
 
-          <nav className="flex items-baseline gap-6">
+          <nav className="flex items-center gap-1 sm:gap-2">
             <TopLink to="/" end>
               Videos
             </TopLink>
@@ -47,20 +44,20 @@ function Shell() {
               href="/api/docs"
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium text-ink-400 transition-colors duration-200 hover:text-ink-200"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
             >
               API
             </a>
           </nav>
 
-          <div className="ml-auto flex items-baseline gap-5">
+          <div className="ml-auto flex items-center gap-4">
             {health && (
-              <span className="numeric hidden text-xs text-ink-400 md:block">
+              <span className="badge numeric hidden md:inline-flex">
                 {health.status} · {health.queued} queued
               </span>
             )}
             {token && (
-              <button onClick={clear} className="text-xs text-ink-500 hover:text-ink-200" title="Forget the stored Bearer key">
+              <button onClick={clear} className="text-xs font-medium text-ink-500 hover:text-ink-900" title="Forget the stored Bearer key">
                 Sign out
               </button>
             )}
@@ -68,7 +65,7 @@ function Shell() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-6 pb-24 lg:px-10">
+      <main className="mx-auto max-w-[1400px] px-6 pb-24 lg:px-10">
         <Outlet />
       </main>
     </div>
@@ -90,8 +87,8 @@ function TopLink({
       end={end}
       className={({ isActive }) =>
         [
-          'text-sm font-medium transition-colors duration-200',
-          isActive ? 'text-sodium-500' : 'text-ink-400 hover:text-ink-200',
+          'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+          isActive ? 'bg-iris-100 text-iris-700' : 'text-ink-500 hover:text-ink-900',
         ].join(' ')
       }
     >
