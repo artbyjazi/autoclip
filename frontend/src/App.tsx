@@ -1,45 +1,70 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
-import { api, type SystemStatus } from './api'
+import { v1 } from './api-v1'
+import { TokenProvider, useToken } from './auth'
 
 /**
- * Application shell.
- *
- * A masthead rather than a sidebar: this is a four-screen tool, and a
- * persistent nav rail would spend a fifth of the width restating that.
+ * Application shell: white masthead, product nav, health badge.
  */
 export function App() {
-  const [system, setSystem] = useState<SystemStatus | null>(null)
+  return (
+    <TokenProvider>
+      <Shell />
+    </TokenProvider>
+  )
+}
+
+function Shell() {
+  const [health, setHealth] = useState<{ status: string; queued: number } | null>(null)
+  const { token, clear } = useToken()
 
   useEffect(() => {
-    api.system().then(setSystem).catch(() => setSystem(null))
+    v1.health().then(setHealth).catch(() => setHealth(null))
   }, [])
 
   return (
-    <div className="min-h-screen bg-ink-900">
-      <header className="border-b border-ink-800">
-        <div className="mx-auto flex max-w-[1600px] items-baseline gap-8 px-6 py-4 lg:px-10">
-          <NavLink to="/" className="group flex items-baseline gap-2.5">
-            <span className="font-display text-2xl leading-none text-ink-100">
-              Auto<span className="italic text-sodium-500">Clip</span>
+    <div className="min-h-screen bg-paper">
+      <header className="sticky top-0 z-10 border-b border-line bg-card/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-3 py-3.5 sm:gap-8 sm:px-6 lg:px-10">
+          <NavLink to="/" className="flex items-baseline gap-2">
+            <span className="font-display text-2xl leading-none text-ink-900">
+              Clippy
             </span>
           </NavLink>
 
-          <nav className="flex items-baseline gap-6">
+          <nav className="flex min-w-0 flex-1 items-center gap-0 overflow-x-auto sm:gap-2">
             <TopLink to="/" end>
-              New
+              Videos
             </TopLink>
+            <TopLink to="/providers">Providers</TopLink>
             <TopLink to="/settings">Settings</TopLink>
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg px-2 py-1.5 text-xs font-medium text-ink-500 transition-colors hover:text-ink-900 sm:px-3 sm:text-sm"
+            >
+              API
+            </a>
           </nav>
 
-          <div className="ml-auto flex items-baseline gap-5">
-            {system && <SystemBadge system={system} />}
+          <div className="ml-auto hidden items-center gap-4 sm:flex">
+            {health && (
+              <span className="badge numeric hidden md:inline-flex">
+                {health.status} · {health.queued} queued
+              </span>
+            )}
+            {token && (
+              <button type="button" onClick={clear} className="text-xs font-medium text-ink-500 hover:text-ink-900" title="Forget the stored Bearer key">
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-6 pb-24 lg:px-10">
+      <main className="mx-auto max-w-[1400px] px-6 pb-24 lg:px-10">
         <Outlet />
       </main>
     </div>
@@ -61,39 +86,12 @@ function TopLink({
       end={end}
       className={({ isActive }) =>
         [
-          'text-sm font-medium transition-colors duration-200',
-          isActive ? 'text-sodium-500' : 'text-ink-400 hover:text-ink-200',
+          'whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+          isActive ? 'bg-iris-100 text-iris-700' : 'text-ink-500 hover:text-ink-900',
         ].join(' ')
       }
     >
       {children}
     </NavLink>
-  )
-}
-
-/**
- * Compact machine status.
- *
- * Surfaced permanently rather than hidden in settings because the two things it
- * reports — whether ffmpeg can render, and whether the GPU is being used — are
- * the two that change how long everything takes.
- */
-function SystemBadge({ system }: { system: SystemStatus }) {
-  const accel = system.accel.toUpperCase()
-  return (
-    <div className="hidden items-baseline gap-4 text-xs md:flex">
-      <span className="numeric text-ink-400">
-        {accel}
-        {system.gpu_name && accel === 'CUDA' && (
-          <span className="text-ink-600"> · {system.gpu_name.replace('NVIDIA GeForce ', '')}</span>
-        )}
-      </span>
-      <span
-        className={system.ready ? 'text-ink-400' : 'text-signal-bad'}
-        title={system.ready ? 'All required components present' : 'Run autoclip doctor'}
-      >
-        {system.ready ? 'ready' : 'not ready'}
-      </span>
-    </div>
   )
 }

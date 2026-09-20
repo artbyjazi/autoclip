@@ -1,4 +1,4 @@
-import { ApiError } from '../api'
+import { ApiError } from '../format'
 
 /**
  * A failure and, where the server offered one, the fix.

@@ -5,8 +5,24 @@ versions follow [semantic versioning](https://semver.org/) once 0.1.0 ships.
 
 ## Unreleased
 
-Everything so far. The first tagged release waits on the reframe acceptance bar
-being validated against a fixed golden video set — see
+## [0.2.0] - 2026-09-20
+
+- Tailscale identity signs the web UI in automatically while Bearer keys remain
+  available for n8n, agents, Swagger, and other API clients.
+- Ssemble-style project dashboard and result rows with progressive previews,
+  transcripts, sorting, duration filters, inline actions, and final downloads.
+- Practical clip editor with transcript-backed trim, caption-style persistence,
+  score breakdown, preview regeneration, and on-demand 1080x1920 renders.
+- Automatic, idempotent preview jobs after analysis plus restart reconciliation,
+  project summaries, source streaming, cancel, and artifact-aware clip state.
+
+## [0.1.0] - 2026-09-19
+
+Bearer-authenticated API v1 as the only REST surface, private Tailscale
+deployment, full Clippy frontend (videos, live SSE progress, clip review with
+scores, on-demand preview/render, providers, settings, API keys, storage),
+free-tier LLM targets, YouTube cookie ingest with JS challenge solving, and the
+§6.4 golden reframe bar green (9/9) — see
 [the README](README.md#what-has-and-hasnt-been-verified).
 
 ### Added
@@ -27,7 +43,7 @@ being validated against a fixed golden video set — see
   trim handles and caption editing, and export.
 - **Resumable stages.** Artifacts live on disk per job, so a retry restarts at the
   stage that failed.
-- **`autoclip doctor`** — probes ffmpeg features, GPU acceleration, compute-type
+- **`clippy doctor`** — probes ffmpeg features, GPU acceleration, compute-type
   support, and provider reachability, and explains what to do about each.
 - **End-to-end test** against real media, covering every stage with only the
   language model's answer scripted.
@@ -41,7 +57,7 @@ Each of these was found by running the thing, not by reading it:
   then can't use it. Selection now queries CTranslate2 for what it actually
   supports.
 - **CUDA libraries were installed and unloadable.** pip places them where the OS
-  loader doesn't look, so the model loaded and died at first inference. AutoClip
+  loader doesn't look, so the model loaded and died at first inference. Clippy
   registers the directories itself.
 - **`h264_nvenc` being listed is not proof it works.** A build can require a newer
   NVENC API than the driver provides. Encoder selection now runs a one-frame probe.

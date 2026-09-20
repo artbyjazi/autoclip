@@ -1,12 +1,12 @@
-# AutoClip architecture
+# Clippy architecture
 
 A single Python process serving a REST API and a compiled React bundle on one
 port, with a pipeline that turns long video into short clips.
 
 ```
                      ┌──────────────────────────────────────┐
-  browser  ◀────────▶│ FastAPI (backend/autoclip/app.py)   │
-                     │  · /api/*        REST + SSE          │
+  browser  ◀────────▶│ FastAPI (backend/clippy/app.py)      │
+                     │  · /api/v1/*     access REST + SSE   │
                      │  · /*            built React bundle  │
                      └───────────────┬──────────────────────┘
                                      │
@@ -17,22 +17,23 @@ port, with a pipeline that turns long video into short clips.
    ┌─────────────────────────────────▼─────────────────────────────────┐
    │ PipelineRunner                                                    │
    │                                                                   │
-   │  prepare → transcribe → highlights → reframe → captions → export  │
+   │  download → audio → ASR chunks → shortlist → LLM → reframe        │
+   │                                then auto-preview/final on demand  │
    │                                                                   │
    │  each stage writes artifacts to work/{job_id}/                    │
    └───────────────────────────────────────────────────────────────────┘
                                      │
                      ┌───────────────▼──────────────────────┐
-                     │ SQLite (~/.autoclip/autoclip.db)   │
+                     │ SQLite (~/.clippy/clippy.db)   │
                      └──────────────────────────────────────┘
 ```
 
 ## Why one process
 
-AutoClip is a local tool used by one person at a time. A queue broker, a worker
+Clippy is a local tool used by one person at a time. A queue broker, a worker
 fleet, and a separate frontend server would each add an install step and a
 failure mode in exchange for concurrency nobody needs. The whole thing is
-`pip install autoclip && autoclip serve`.
+`pip install clippy && clippy serve`.
 
 The same reasoning drives the FIFO queue: transcription, face detection, and
 encoding each want the entire GPU. Running two jobs at once on a 6 GB card makes
@@ -41,11 +42,13 @@ both slower than running them in sequence.
 ## Layout
 
 ```
-backend/autoclip/
+backend/clippy/
 ├── app.py            FastAPI application and static serving
 ├── cli.py            Typer CLI — doctor, clip, serve, config
-├── paths.py          artifact layout under AUTOCLIP_HOME
-├── config.py         settings + OS-keyring secrets
+├── paths.py          artifact layout under CLIPPY_HOME
+├── config.py         settings + keyring/0600 secret-file storage
+├── security.py       Bearer verification + loopback-only Tailscale identity
+├── storage.py        retention accounting and conservative cleanup
 ├── system.py         environment probing (ffmpeg, GPU, deps)
 ├── models.py         ML model bundle download and cache
 ├── api/              REST routers and wire schemas
@@ -60,9 +63,10 @@ backend/autoclip/
     ├── ingest.py     yt-dlp and file upload
     ├── prepare.py    audio extraction, thumbnails, silence map
     ├── transcribe.py faster-whisper + WhisperX diarization
+    ├── asr.py        Groq/Gemini/local routing and persisted chunks
     ├── boundaries.py sentence snap, duration clamp, silence alignment
-    ├── highlights.py windowing, dedupe, ranking
-    ├── captions.py   ASS generation and the four presets
+    ├── highlights.py heuristic shortlist, LLM scoring, dedupe, ranking
+    ├── captions.py   ASS generation and the five public presets
     ├── export.py     the render
     ├── runner.py     stage orchestration and resume
     └── reframe/      scenes, faces, tracker, speaker, smoothing, croppath
@@ -122,7 +126,7 @@ Two checks look redundant and are not:
   can require a newer NVENC API than the installed driver provides, and that
   also only surfaces mid-render.
 
-Both are probed functionally, and `autoclip doctor` reports what it actually
+Both are probed functionally, and `clippy doctor` reports what it actually
 tried.
 
 ### Compute type follows the hardware
@@ -133,7 +137,7 @@ capability rather than assuming "GPU means float16".
 
 ## Data model
 
-Six tables (`db/schema.py`), migrated by SQLite's `user_version` pragma. Each
+Nine tables (`db/schema.py`), migrated by SQLite's `user_version` pragma. Each
 migration is append-only: once a user's database is at v3, editing migration 2
 silently diverges their schema from a fresh install's.
 
@@ -145,12 +149,16 @@ silently diverges their schema from a fresh install's.
 | `clips`      | detected clips with boundaries and scores           |
 | `clip_edits` | user caption edits, style, ratio                    |
 | `exports`    | rendered files                                      |
+| `provider_targets` | ordered LLM/ASR models, health and cooldown   |
+| `provider_usage` | latency, tokens, audio seconds and outcome        |
+| `api_keys` | incoming Bearer hashes, prefixes and revocation          |
 
 ## Provider abstraction
 
-`providers/base.py` defines one Protocol. Four adapters implement it; the
-OpenAI-compatible one is the widest, because a configurable `base_url` also
-covers OpenRouter, Groq, DeepSeek, Together, and any local server.
+`providers/base.py` defines one Protocol. The persistent router selects Gemini,
+Groq, OpenRouter, or local fallback targets by priority and availability.
+Cooldown, authentication failure, latency, token usage, and audio seconds are
+stored in SQLite. A replacement secret clears that provider's auth circuit.
 
 The retry-with-feedback loop lives in the base class: a schema violation is
 retried once with the validation error appended to the prompt. Small local

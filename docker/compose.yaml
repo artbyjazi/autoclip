@@ -1,40 +1,40 @@
-name: autoclip
+name: clippy
 
 services:
-  autoclip:
+  clippy:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: base
-    image: autoclip:latest
+    image: clippy:latest
     ports:
-      # Bound to loopback: AutoClip has no authentication, so it must not be
-      # reachable from the network by default. Change to "8000:8000" only on a
-      # network you trust.
+      # Bound to loopback because the deprecated UI API is not Bearer-protected.
+      # Keep the service behind an authenticated private proxy such as
+      # Tailscale Serve.
       - '127.0.0.1:8000:8000'
     volumes:
-      - autoclip-data:/data
+      - clippy-data:/data
       # Drop source files here to ingest them without uploading through the UI.
       - ./media:/media:ro
     environment:
-      AUTOCLIP_HOME: /data
+      CLIPPY_HOME: /data
     restart: unless-stopped
 
   # docker compose --profile gpu up
-  autoclip-gpu:
+  clippy-gpu:
     profiles: ['gpu']
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: gpu
-    image: autoclip:gpu
+    image: clippy:gpu
     ports:
       - '127.0.0.1:8000:8000'
     volumes:
-      - autoclip-data:/data
+      - clippy-data:/data
       - ./media:/media:ro
     environment:
-      AUTOCLIP_HOME: /data
+      CLIPPY_HOME: /data
       NVIDIA_VISIBLE_DEVICES: all
     deploy:
       resources:
@@ -46,4 +46,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  autoclip-data:
+  clippy-data:

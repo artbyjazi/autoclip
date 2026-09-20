@@ -1,106 +1,99 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { api, formatDuration } from '../api'
+import { v1 } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
-import { useJobStream } from '../useJobStream'
+import { formatDuration } from '../format'
+import { useV1JobStream, type V1StageProgress } from '../useV1JobStream'
+import type { V1JobOut } from '../api-v1'
 
-/** Stage order and labels, mirroring autoclip.pipeline.Stage. */
+/** v1 current_stage values in pipeline order, per docs/HANDOFF_OPENCODE.md. */
 const STAGES = [
-  { key: 'prepare', label: 'Prepare', note: 'Extracting audio and thumbnails' },
-  { key: 'transcribe', label: 'Transcribe', note: 'Word-level timing' },
-  { key: 'highlights', label: 'Highlights', note: 'Choosing the moments worth cutting' },
+  { key: 'download', label: 'Download', note: 'Fetching the source video' },
+  { key: 'prepare', label: 'Prepare audio', note: 'Extracting mono 16 kHz audio' },
+  { key: 'transcribe', label: 'Transcribe', note: 'Word-level timing, cloud first' },
+  { key: 'highlights', label: 'Find highlights', note: 'Candidates, AI analysis and ranking' },
   { key: 'reframe', label: 'Reframe', note: 'Tracking the speaker into vertical' },
-  { key: 'captions', label: 'Captions', note: 'Building subtitle timing' },
-  { key: 'export', label: 'Export', note: 'Rendering clips' },
+  { key: 'captions', label: 'Captions', note: 'Validating the selected caption style' },
+  { key: 'ready_for_review', label: 'Ready', note: 'Clips ranked, awaiting review' },
 ] as const
+
+const TERMINAL_GOOD = new Set(['ready_for_review', 'completed'])
 
 export function JobProgress() {
   const { jobId } = useParams()
   const navigate = useNavigate()
-  const { job, progress } = useJobStream(jobId)
-  const [cancelling, setCancelling] = useState(false)
-  const [actionError, setActionError] = useState<Error | null>(null)
+  const { job, progress, connected, setJob } = useV1JobStream(jobId)
 
   useEffect(() => {
-    if (job?.status === 'done') {
+    if (job && TERMINAL_GOOD.has(job.status) && job.kind === 'analysis') {
       // A short hold so the completed state is legible rather than a flash.
-      const timer = setTimeout(() => navigate(`/jobs/${job.id}/clips`), 900)
+      const timer = setTimeout(() => navigate(`/videos/${job.source_id}/clips`), 900)
       return () => clearTimeout(timer)
     }
-  }, [job?.status, job?.id, navigate])
+  }, [job?.status, job?.source_id, navigate])
 
   if (!job) {
-    return <p className="pt-24 text-sm text-ink-500">Loading…</p>
+    return (
+      <div className="card mx-auto mt-16 max-w-xl p-10 text-center">
+        <p className="text-sm text-ink-500">Loading job…</p>
+      </div>
+    )
   }
 
-  const activeIndex = STAGES.findIndex((s) => s.key === job.current_stage)
+  const cancel = async () => { if (jobId) setJob(await v1.cancelJob(jobId)) }
+  const retry = async () => { if (jobId) setJob(await v1.retryJob(jobId)) }
+
+  return <JobProgressContent job={job} progress={progress} connected={connected} onCancel={cancel} onRetry={retry} onReview={() => navigate(`/videos/${job.source_id}/clips`)} />
+}
+
+function JobProgressContent({ job, progress, connected, onCancel, onRetry, onReview }: {
+  job: V1JobOut
+  progress: V1StageProgress | null
+  connected: boolean
+  onCancel: () => Promise<void>
+  onRetry: () => Promise<void>
+  onReview: () => void
+}) {
   const percent = Math.round((progress?.overall ?? job.progress) * 100)
-
-  const cancel = async () => {
-    setCancelling(true)
-    setActionError(null)
-    try {
-      await api.cancelJob(job.id)
-    } catch (err) {
-      setActionError(err as Error)
-    } finally {
-      setCancelling(false)
-    }
-  }
-
-  const retry = async () => {
-    setActionError(null)
-    try {
-      await api.retryJob(job.id)
-      window.location.reload()
-    } catch (err) {
-      setActionError(err as Error)
-    }
-  }
+  const failed = job.status === 'failed' || job.status === 'cancelled'
 
   return (
-    <div className="pt-14">
-      <div className="rise flex flex-wrap items-baseline justify-between gap-6 border-b border-ink-800 pb-6">
-        <div className="min-w-0">
-          <p className="eyebrow">{job.status}</p>
-          <h1 className="mt-2 max-w-3xl truncate font-display text-[clamp(1.75rem,4vw,3rem)] leading-tight text-ink-100">
-            {job.source?.title || 'Untitled'}
-          </h1>
-          {job.source && (
-            <p className="numeric mt-2 text-xs text-ink-500">
-              {formatDuration(job.source.duration_s)}
-              {job.source.width ? ` · ${job.source.width}×${job.source.height}` : ''} ·{' '}
-              {job.provider}
-            </p>
-          )}
+    <div className="mx-auto max-w-2xl pt-10">
+      <div className="rise card p-6 text-center sm:p-10">
+        <p className="eyebrow">
+          {job.kind} · {job.status}
+          {!connected && !TERMINAL_GOOD.has(job.status) && !failed ? ' · reconnecting…' : ''}
+        </p>
+        <h1 className="mx-auto mt-3 max-w-xl truncate font-display text-[clamp(1.5rem,4vw,2.5rem)] leading-tight text-ink-900">
+          {job.source?.title || 'Untitled'}
+        </h1>
+        {job.source && (
+          <p className="numeric mt-2 text-xs text-ink-500">
+            {formatDuration(job.source.duration_s)}
+            {job.source.width ? ` · ${job.source.width}×${job.source.height}` : ''}
+          </p>
+        )}
+
+        <p className="numeric mt-6 font-display text-[clamp(3.5rem,10vw,5.5rem)] leading-none text-iris-600">
+          {percent}
+          <span className="text-3xl text-ink-400">%</span>
+        </p>
+        <div className="meter mx-auto mt-4 max-w-md">
+          <span className="sweep" style={{ width: `${percent}%` }} />
         </div>
 
-        <div className="flex items-baseline gap-8">
-          <span className="numeric font-display text-[clamp(2.5rem,6vw,4rem)] leading-none text-sodium-500">
-            {percent}
-            <span className="text-2xl text-ink-600">%</span>
-          </span>
-          {(job.status === 'running' || job.status === 'queued') && (
-            <button onClick={cancel} disabled={cancelling} className="btn btn-ghost">
-              {cancelling ? 'Cancelling…' : 'Cancel'}
-            </button>
-          )}
-          {(job.status === 'failed' || job.status === 'cancelled') && (
-            <button onClick={retry} className="btn btn-primary">
-              Retry
-            </button>
-          )}
-          {job.status === 'done' && (
-            <button onClick={() => navigate(`/jobs/${job.id}/clips`)} className="btn btn-primary">
-              Review clips
-            </button>
-          )}
-        </div>
+        {TERMINAL_GOOD.has(job.status) && (
+          <button type="button" onClick={onReview} className="btn btn-primary mt-6">
+            Review clips
+          </button>
+        )}
+        {!TERMINAL_GOOD.has(job.status) && !failed && <button type="button" onClick={() => void onCancel()} className="btn btn-ghost mt-6">Cancel</button>}
+        {failed && <button type="button" onClick={() => void onRetry()} className="btn btn-primary mt-6">Retry from {job.current_stage || 'last stage'}</button>}
       </div>
 
       {job.error && (
-        <div className="mt-8 max-w-3xl">
+        <div className="card mt-6 border-signal-bad p-5">
           <ErrorNote error={new Error(job.error)} />
           <p className="mt-3 text-xs text-ink-500">
             Retrying resumes from the stage that failed — finished stages are not redone.
@@ -108,89 +101,40 @@ export function JobProgress() {
         </div>
       )}
 
-      {actionError && (
-        <div className="mt-8 max-w-3xl">
-          <ErrorNote error={actionError} onDismiss={() => setActionError(null)} />
-        </div>
-      )}
-
-      <ol className="mt-12 max-w-3xl">
-        {STAGES.map((stage, index) => {
-          // A failed job stopped *at* current_stage, so that stage must read as
-          // failed rather than as still running — otherwise the checklist claims
-          // work is in progress while the banner says it died.
-          const failedHere =
-            (job.status === 'failed' || job.status === 'cancelled') && index === activeIndex
-
-          const state =
-            job.status === 'done' || (activeIndex >= 0 && index < activeIndex)
-              ? 'done'
-              : failedHere
-                ? 'stopped'
-                : index === activeIndex && job.status === 'running'
-                  ? 'active'
-                  : 'pending'
-
-          const fraction =
-            state === 'done' ? 1 : state === 'active' ? (progress?.stageProgress ?? 0) : 0
-
-          return (
-            <li
-              key={stage.key}
-              className="rise grid grid-cols-[2.5rem_1fr] items-start gap-x-5 border-b border-ink-850 py-5"
-              style={{ animationDelay: `${index * 55}ms` }}
-            >
-              <span
-                className={[
-                  'numeric pt-0.5 text-xs',
-                  state === 'done'
-                    ? 'text-signal-good'
-                    : state === 'stopped'
-                      ? 'text-signal-bad'
-                      : state === 'active'
-                        ? 'text-sodium-500'
-                        : 'text-ink-600',
-                ].join(' ')}
-              >
-                {state === 'done' ? '✓' : state === 'stopped' ? '✕' : String(index + 1).padStart(2, '0')}
-              </span>
-
-              <div>
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                  <span
-                    className={[
-                      'text-[0.9375rem]',
-                      state === 'pending' ? 'text-ink-600' : 'text-ink-100',
-                    ].join(' ')}
-                  >
-                    {stage.label}
-                  </span>
-                  <span
-                    className={`text-xs ${state === 'stopped' ? 'text-signal-bad' : 'text-ink-500'}`}
-                  >
-                    {state === 'stopped'
-                      ? job.status === 'cancelled'
-                        ? 'cancelled here'
-                        : 'failed here'
-                      : state === 'active'
-                        ? (progress?.message ?? stage.note)
-                        : stage.note}
-                  </span>
-                </div>
-
-                {/* A hairline that fills. No track chrome — the rule below the
-                    row already provides the container. */}
-                <div className="mt-3 h-px w-full bg-ink-800">
-                  <div
-                    className="h-px origin-left bg-sodium-500 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                    style={{ transform: `scaleX(${fraction})` }}
-                  />
-                </div>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
+      <StageList job={job} progress={progress} />
     </div>
   )
+}
+
+function StageList({ job, progress }: { job: V1JobOut; progress: V1StageProgress | null }) {
+  const activeIndex = STAGES.findIndex((stage) => stage.key === job.current_stage)
+  const failed = job.status === 'failed' || job.status === 'cancelled'
+  return <ol className="card mt-6 p-2">{STAGES.map((stage, index) => {
+    const state = stageState(job.status, activeIndex, index, failed)
+    return <li key={stage.key} className={`flex items-center gap-4 rounded-xl px-4 py-3 ${state === 'active' ? 'bg-iris-50' : ''}`}>
+      <span className={`numeric flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${stageBadgeClass(state)}`}>
+        {state === 'done' ? '✓' : state === 'stopped' ? '✕' : index + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-semibold ${state === 'pending' ? 'text-ink-400' : 'text-ink-900'}`}>{stage.label}</p>
+        <p className="truncate text-xs text-ink-500">{state === 'active' ? (progress?.message ?? stage.note) : stage.note}</p>
+      </div>
+    </li>
+  })}</ol>
+}
+
+type StageState = 'done' | 'stopped' | 'active' | 'pending'
+
+function stageState(status: string, activeIndex: number, index: number, failed: boolean): StageState {
+  if (TERMINAL_GOOD.has(status) || (activeIndex >= 0 && index < activeIndex)) return 'done'
+  if (failed && index === activeIndex) return 'stopped'
+  if (index === activeIndex && status === 'running') return 'active'
+  return 'pending'
+}
+
+function stageBadgeClass(state: StageState): string {
+  if (state === 'done') return 'bg-signal-good-bg text-signal-good'
+  if (state === 'stopped') return 'bg-signal-bad-bg text-signal-bad'
+  if (state === 'active') return 'bg-iris-600 text-white'
+  return 'bg-paper text-ink-400'
 }
