@@ -1,6 +1,6 @@
 # Clippy v0.1 frontend handoff
 
-Backend contract freeze: `clippy-backend-v0.1.0-rc1`.
+Backend contract freeze: `v0.1.0`.
 
 OpenCode owns frontend identity, UX, responsive behavior, and client-side tests.
 It must consume `docs/openapi-v1.json` and must not change SQLite migrations,
