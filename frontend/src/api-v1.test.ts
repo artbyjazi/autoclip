@@ -23,7 +23,7 @@ describe('v1 client', () => {
     const health = await v1.health()
 
     expect(health).toEqual({ status: 'ok', queued: 0 })
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer clp_test')
   })
 
