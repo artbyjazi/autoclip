@@ -119,7 +119,7 @@ jobs:
           enable-cache: true
 
       - name: Install ffmpeg and vision libs
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libgl1 libglib2.0-0
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libegl1 libgles2 libgl1 libglib2.0-0 libopengl0
 
       - name: Create the environment
         run: uv venv --python 3.12
@@ -179,7 +179,7 @@ jobs:
         run: |
           docker run -d --name clippy -p 8000:8000 clippy:ci
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/api/health; then
+            if curl -fsS http://localhost:8000/api/v1/health; then
               echo "\nHealthy."
               exit 0
             fi

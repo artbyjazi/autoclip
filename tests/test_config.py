@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -114,6 +115,9 @@ class TestSecrets:
 class TestSecretsWithoutKeyring:
     """Headless installs use a separate owner-only secret file."""
 
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="Windows has no POSIX owner-only file modes"
+    )
     def test_file_store_is_owner_only(self, no_keyring) -> None:
         secure = config.set_secret("anthropic", "sk-plaintext")
 
