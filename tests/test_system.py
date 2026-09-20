@@ -8,7 +8,7 @@ cost users performance or produce a broken render.
 from __future__ import annotations
 
 import pytest
-from autoclip.system import REQUIRED_FILTERS, FFmpegInfo, GPUInfo
+from clippy.system import REQUIRED_FILTERS, FFmpegInfo, GPUInfo
 
 #: What CTranslate2 actually reports on a Pascal card (verified on a GTX 1060).
 #: Note the complete absence of any fp16 type, despite CUDA advertising fp16
@@ -103,12 +103,12 @@ class TestComputeTypeOverride:
     """A forced compute type is honoured only when the device supports it."""
 
     def _settings(self, compute_type: str):
-        from autoclip.config import WhisperSettings
+        from clippy.config import WhisperSettings
 
         return WhisperSettings(compute_type=compute_type)
 
     def test_supported_override_is_honoured(self) -> None:
-        from autoclip.pipeline.transcribe import resolve_compute
+        from clippy.pipeline.transcribe import resolve_compute
 
         gpu = GPUInfo(accel="cuda", compute_capability=6.1, supported_compute_types=PASCAL_SUPPORT)
 
@@ -117,7 +117,7 @@ class TestComputeTypeOverride:
     def test_unsupported_override_is_ignored(self) -> None:
         # Honouring it would fail at model load with a message blaming cuDNN,
         # which sends the user chasing the wrong problem entirely.
-        from autoclip.pipeline.transcribe import resolve_compute
+        from clippy.pipeline.transcribe import resolve_compute
 
         gpu = GPUInfo(accel="cuda", compute_capability=6.1, supported_compute_types=PASCAL_SUPPORT)
 
@@ -127,7 +127,7 @@ class TestComputeTypeOverride:
         assert compute_type == "int8_float32"
 
     def test_empty_override_uses_automatic_selection(self) -> None:
-        from autoclip.pipeline.transcribe import resolve_compute
+        from clippy.pipeline.transcribe import resolve_compute
 
         gpu = GPUInfo(accel="cuda", compute_capability=7.5, supported_compute_types=TURING_SUPPORT)
 
@@ -135,7 +135,7 @@ class TestComputeTypeOverride:
 
     def test_override_is_trusted_when_support_is_unknown(self) -> None:
         # No probe result means no basis to overrule the user.
-        from autoclip.pipeline.transcribe import resolve_compute
+        from clippy.pipeline.transcribe import resolve_compute
 
         gpu = GPUInfo(accel="cuda", supported_compute_types=frozenset())
 

@@ -6,16 +6,23 @@ import json
 from pathlib import Path
 
 import pytest
-from autoclip import config, paths
+from clippy import config, paths
 
 
 def test_defaults_load_without_a_config_file() -> None:
     settings = config.load()
 
-    assert settings.active_provider == "anthropic"
+    assert settings.active_provider == "gemini"
     assert settings.whisper.model == "small"
     assert settings.export.loudness_lufs == -14.0
-    assert set(settings.providers) == {"anthropic", "openai", "gemini", "ollama"}
+    assert set(settings.providers) == {
+        "anthropic",
+        "openai",
+        "gemini",
+        "groq",
+        "openrouter",
+        "ollama",
+    }
 
 
 def test_settings_round_trip() -> None:
@@ -37,7 +44,7 @@ def test_load_falls_back_to_defaults_on_corrupt_file() -> None:
 
     settings = config.load()
 
-    assert settings.active_provider == "anthropic"
+    assert settings.active_provider == "gemini"
 
 
 def test_provider_returns_active_by_default() -> None:
@@ -46,6 +53,14 @@ def test_provider_returns_active_by_default() -> None:
 
     assert settings.provider().model == settings.providers["gemini"].model
     assert settings.provider("openai").model == "gpt-4o"
+
+
+def test_operator_cookie_path_can_come_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLIPPY_YOUTUBE_COOKIES_FILE", "/run/secrets/youtube-cookies.txt")
+
+    assert config.load().ingest.cookies_file == "/run/secrets/youtube-cookies.txt"
 
 
 def test_unknown_provider_key_is_created_on_demand() -> None:
@@ -91,19 +106,20 @@ class TestSecrets:
         self, fake_keyring, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         config.set_secret("anthropic", "from-keyring")
-        monkeypatch.setenv("AUTOCLIP_ANTHROPIC_KEY", "from-env")
+        monkeypatch.setenv("CLIPPY_ANTHROPIC_KEY", "from-env")
 
         assert config.get_secret("anthropic") == "from-env"
 
 
 class TestSecretsWithoutKeyring:
-    """Without a keyring backend we fall back to disk — loudly, never silently."""
+    """Headless installs use a separate owner-only secret file."""
 
-    def test_fallback_reports_insecure_storage(self, no_keyring) -> None:
+    def test_file_store_is_owner_only(self, no_keyring) -> None:
         secure = config.set_secret("anthropic", "sk-plaintext")
 
         assert secure is False
-        assert config.load().insecure_secret_storage is True
+        assert config.load().insecure_secret_storage is False
+        assert paths.secrets_path().stat().st_mode & 0o777 == 0o600
 
     def test_fallback_secret_is_still_readable(self, no_keyring) -> None:
         config.set_secret("anthropic", "sk-plaintext")
@@ -117,9 +133,11 @@ class TestSecretsWithoutKeyring:
         # The secret must survive a round trip but stay out of model_dump, so it
         # can never leak through an API response that serialises settings.
         assert "sk-plaintext" not in json.dumps(settings.model_dump(mode="json"))
-        assert settings._fallback_secrets["anthropic"] == "sk-plaintext"
+        assert "sk-plaintext" in paths.secrets_path().read_text(encoding="utf-8")
+        if paths.config_path().exists():
+            assert "sk-plaintext" not in paths.config_path().read_text(encoding="utf-8")
 
-    def test_deleting_last_fallback_clears_the_insecure_flag(self, no_keyring) -> None:
+    def test_deleting_last_file_secret_keeps_secure_flag(self, no_keyring) -> None:
         config.set_secret("anthropic", "sk-plaintext")
         config.delete_secret("anthropic")
 
@@ -136,8 +154,8 @@ class TestSecretsWithoutKeyring:
         assert config.get_secret("gemini") == "sk-gemini"
 
 
-def test_config_file_is_written_under_autoclip_home(autoclip_home: Path) -> None:
+def test_config_file_is_written_under_clippy_home(clippy_home: Path) -> None:
     config.save(config.load())
 
-    assert paths.config_path() == autoclip_home.resolve() / "config.json"
+    assert paths.config_path() == clippy_home.resolve() / "config.json"
     assert paths.config_path().exists()

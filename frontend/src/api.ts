@@ -1,5 +1,5 @@
 /**
- * Typed client for the AutoClip API.
+ * Typed client for the Clippy API.
  *
  * Same-origin throughout: the server hands out the built bundle, so there is no
  * base URL to configure and no CORS to negotiate.
@@ -94,7 +94,7 @@ export interface CropSegment {
   fit: boolean
 }
 
-/** Mirrors autoclip.pipeline.reframe.croppath.CropPath. */
+/** Mirrors clippy.pipeline.reframe.croppath.CropPath. */
 export interface CropPath {
   source_width: number
   source_height: number

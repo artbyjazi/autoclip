@@ -13,7 +13,7 @@ and fails on real footage.
 
 Point it at a file to run it::
 
-    set AUTOCLIP_E2E_MEDIA=C:\\path\\to\\clip.mp4
+    set CLIPPY_E2E_MEDIA=C:\\path\\to\\clip.mp4
     pytest -m e2e -q
 
 Use something short — a few minutes. Transcription dominates the runtime.
@@ -25,20 +25,20 @@ import os
 from pathlib import Path
 
 import pytest
-from autoclip.config import Settings
-from autoclip.db import store
-from autoclip.db.models import Job, new_id
-from autoclip.pipeline import Stage, ingest
-from autoclip.pipeline.export import ratio_dimensions
-from autoclip.pipeline.ffmpeg import probe
-from autoclip.pipeline.reframe.croppath import CropPath
-from autoclip.pipeline.runner import JobWorkspace, PipelineRunner
-from autoclip.pipeline.transcript import Transcript
-from autoclip.providers import ClipCandidates, DetectionConfig, LLMProvider, ProviderStatus
+from clippy.config import Settings
+from clippy.db import store
+from clippy.db.models import Job, new_id
+from clippy.pipeline import Stage, ingest
+from clippy.pipeline.export import ratio_dimensions
+from clippy.pipeline.ffmpeg import probe
+from clippy.pipeline.reframe.croppath import CropPath
+from clippy.pipeline.runner import JobWorkspace, PipelineRunner
+from clippy.pipeline.transcript import Transcript
+from clippy.providers import ClipCandidates, DetectionConfig, LLMProvider, ProviderStatus
 
 pytestmark = [pytest.mark.slow, pytest.mark.e2e]
 
-ENV_MEDIA = "AUTOCLIP_E2E_MEDIA"
+ENV_MEDIA = "CLIPPY_E2E_MEDIA"
 
 
 def media_path() -> Path:
@@ -118,15 +118,15 @@ class ScriptedProvider(LLMProvider):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def autoclip_home(tmp_path_factory):
+def clippy_home(tmp_path_factory):
     """One throwaway home for the whole module.
 
     Shadows the function-scoped autouse fixture in conftest by name. Without
     this the pipeline runs once and then every assertion looks at a fresh empty
-    database, because the shared fixture repoints AUTOCLIP_HOME per test.
+    database, because the shared fixture repoints CLIPPY_HOME per test.
     """
     from _pytest.monkeypatch import MonkeyPatch
-    from autoclip import db, paths
+    from clippy import db, paths
 
     patcher = MonkeyPatch()
     home = tmp_path_factory.mktemp("e2e_home")
@@ -140,10 +140,10 @@ def autoclip_home(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def pipeline_result(autoclip_home):
+def pipeline_result(clippy_home):
     """Run the whole pipeline once; every test below inspects the result."""
-    from autoclip import db
-    from autoclip.pipeline import runner as runner_module
+    from clippy import db
+    from clippy.pipeline import runner as runner_module
 
     source_file = media_path()
     db.init()
@@ -319,7 +319,7 @@ class TestReframe:
         detection silently did nothing — the failure this whole stage exists to
         avoid.
         """
-        from autoclip.pipeline.reframe.croppath import Strategy
+        from clippy.pipeline.reframe.croppath import Strategy
 
         workspace = pipeline_result["workspace"]
         strategies = {
@@ -371,7 +371,7 @@ class TestResume:
         Resume is the difference between a rate-limit retry costing seconds and
         costing another full transcription pass.
         """
-        from autoclip.pipeline import runner as runner_module
+        from clippy.pipeline import runner as runner_module
 
         workspace = pipeline_result["workspace"]
         transcript_mtime = workspace.transcript.stat().st_mtime

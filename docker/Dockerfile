@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-# AutoClip — CPU image.
+# Clippy — CPU image.
 #
 # Docker is the guaranteed path: it pins ffmpeg with libass, the exact Python
 # version MediaPipe has wheels for, and the font situation, all of which are the
 # usual sources of "works on my machine" in this space.
 #
 # For NVIDIA GPUs, build with:
-#   docker build -f docker/Dockerfile --target gpu -t autoclip:gpu .
+#   docker build -f docker/Dockerfile --target gpu -t clippy:gpu .
 
 # ---------------------------------------------------------------------------
 # Frontend build
@@ -19,8 +19,8 @@ COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
-# Vite writes into ../backend/autoclip/static, so that path has to exist.
-RUN mkdir -p /backend/autoclip && npm run build -- --outDir /backend/autoclip/static
+# Vite writes into ../backend/clippy/static, so that path has to exist.
+RUN mkdir -p /backend/clippy && npm run build -- --outDir /backend/clippy/static
 
 # ---------------------------------------------------------------------------
 # Runtime base
@@ -32,7 +32,7 @@ FROM python:3.12-slim AS base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    AUTOCLIP_HOME=/data
+    CLIPPY_HOME=/data
 
 # ffmpeg from Debian is built with libass and libx264. fonts-liberation gives
 # fontconfig a sane fallback if a caption style ever asks for a missing face.
@@ -48,7 +48,7 @@ WORKDIR /app
 
 COPY pyproject.toml README.md LICENSE ./
 COPY backend/ ./backend/
-COPY --from=frontend /backend/autoclip/static ./backend/autoclip/static
+COPY --from=frontend /backend/clippy/static ./backend/clippy/static
 
 RUN pip install --no-cache-dir .
 
@@ -62,9 +62,9 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/health || exit 1
 
-# 0.0.0.0 is required to reach the container at all. There is no authentication,
-# so publish the port only to a network you trust.
-CMD ["autoclip", "serve", "--host", "0.0.0.0", "--port", "8000", "--no-open"]
+# 0.0.0.0 is required inside the container. Compose publishes it on host
+# loopback because the deprecated UI API is not Bearer-protected.
+CMD ["clippy", "serve", "--host", "0.0.0.0", "--port", "8000", "--no-open"]
 
 # ---------------------------------------------------------------------------
 # GPU variant

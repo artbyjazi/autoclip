@@ -90,7 +90,7 @@ function SystemBadge({ system }: { system: SystemStatus }) {
       </span>
       <span
         className={system.ready ? 'text-ink-400' : 'text-signal-bad'}
-        title={system.ready ? 'All required components present' : 'Run autoclip doctor'}
+        title={system.ready ? 'All required components present' : 'Run clippy doctor'}
       >
         {system.ready ? 'ready' : 'not ready'}
       </span>

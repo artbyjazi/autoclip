@@ -27,7 +27,7 @@ being validated against a fixed golden video set — see
   trim handles and caption editing, and export.
 - **Resumable stages.** Artifacts live on disk per job, so a retry restarts at the
   stage that failed.
-- **`autoclip doctor`** — probes ffmpeg features, GPU acceleration, compute-type
+- **`clippy doctor`** — probes ffmpeg features, GPU acceleration, compute-type
   support, and provider reachability, and explains what to do about each.
 - **End-to-end test** against real media, covering every stage with only the
   language model's answer scripted.
@@ -41,7 +41,7 @@ Each of these was found by running the thing, not by reading it:
   then can't use it. Selection now queries CTranslate2 for what it actually
   supports.
 - **CUDA libraries were installed and unloadable.** pip places them where the OS
-  loader doesn't look, so the model loaded and died at first inference. AutoClip
+  loader doesn't look, so the model loaded and died at first inference. Clippy
   registers the directories itself.
 - **`h264_nvenc` being listed is not proof it works.** A build can require a newer
   NVENC API than the driver provides. Encoder selection now runs a one-frame probe.
