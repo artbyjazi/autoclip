@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
+import os
 import secrets
 
-from fastapi import HTTPException, Security, status
+from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .db import store
@@ -55,3 +57,59 @@ async def require_api_key(
         )
     store.touch_api_key(record.id)
     return record
+
+
+TAILSCALE_USERS_ENV = "CLIPPY_TAILSCALE_USERS"
+
+
+def _is_loopback(host: str | None) -> bool:
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
+def _tailscale_identity(request: Request) -> str | None:
+    """Return the trusted Serve identity, never an arbitrary client header.
+
+    Tailscale Serve strips spoofed identity headers before adding its own.  The
+    remaining trust boundary is the reverse-proxy hop, so we only accept the
+    header when FastAPI sees a loopback peer.  Clippy's production service is
+    deliberately bound to 127.0.0.1 for this reason.
+    """
+
+    if not _is_loopback(request.client.host if request.client else None):
+        return None
+    login = request.headers.get("Tailscale-User-Login", "").strip()
+    if not login:
+        return None
+    allowed = {
+        item.strip().casefold()
+        for item in os.environ.get(TAILSCALE_USERS_ENV, "").split(",")
+        if item.strip()
+    }
+    if allowed and login.casefold() not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Tailscale user not allowed."
+        )
+    return login
+
+
+async def require_access(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+) -> ApiKey | str:
+    """Authorize either an automation Bearer key or a Tailscale web user."""
+
+    if credentials is not None:
+        return await require_api_key(credentials)
+    identity = _tailscale_identity(request)
+    if identity:
+        return identity
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="A Clippy Bearer API key or Tailscale Serve identity is required.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -25,10 +25,9 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('AuthGate', () => {
-  it('asks for a token when none is stored', () => {
+  it('lets Tailscale-authenticated production requests try without a token', () => {
     renderGate()
-    expect(screen.getByText(/Paste your/i)).toBeTruthy()
-    expect(screen.queryByText('protected content')).toBeNull()
+    expect(screen.getByText('protected content')).toBeTruthy()
   })
 
   it('renders children when a token is stored', () => {
@@ -37,8 +36,10 @@ describe('AuthGate', () => {
     expect(screen.getByText('protected content')).toBeTruthy()
   })
 
-  it('lets the legacy settings page through without a token', () => {
-    renderGate('/settings')
-    expect(screen.getByText('protected content')).toBeTruthy()
+  it('shows the local API-key fallback only after a 401', () => {
+    renderGate()
+    act(() => window.dispatchEvent(new Event('clippy:unauthorized')))
+    expect(screen.getByText(/Local development fallback/i)).toBeTruthy()
+    expect(screen.queryByText('protected content')).toBeNull()
   })
 })

@@ -118,6 +118,60 @@
         "title": "ApiKeyOut",
         "type": "object"
       },
+      "ArtifactStateOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "export": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "status": {
+            "enum": [
+              "missing",
+              "queued",
+              "running",
+              "ready",
+              "stale",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ArtifactStateOut",
+        "type": "object"
+      },
       "ClipOut": {
         "properties": {
           "caption_style": {
@@ -149,6 +203,9 @@
             "title": "Exports",
             "type": "array"
           },
+          "final": {
+            "$ref": "#/components/schemas/ArtifactStateOut"
+          },
           "hook": {
             "title": "Hook",
             "type": "string"
@@ -165,6 +222,9 @@
             "additionalProperties": true,
             "title": "Metadata",
             "type": "object"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/ArtifactStateOut"
           },
           "provider_target": {
             "default": "",
@@ -237,6 +297,17 @@
       },
       "ClipPatchIn": {
         "properties": {
+          "caption_style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption Style"
+          },
           "end_s": {
             "anyOf": [
               {
@@ -291,6 +362,27 @@
           }
         },
         "title": "ClipPatchIn",
+        "type": "object"
+      },
+      "ClipTranscriptOut": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/WordOut"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "text",
+          "words"
+        ],
+        "title": "ClipTranscriptOut",
         "type": "object"
       },
       "ExportOut": {
@@ -475,6 +567,17 @@
       "JobSettingsIn": {
         "description": "Per-job overrides. Anything omitted falls back to saved settings.",
         "properties": {
+          "auto_preview": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Preview"
+          },
           "caption_style": {
             "anyOf": [
               {
@@ -1004,6 +1107,179 @@
         ],
         "title": "VideoCreateOut",
         "type": "object"
+      },
+      "VideoSummaryOut": {
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "clip_count": {
+            "default": 0,
+            "title": "Clip Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "number"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "final_ready_count": {
+            "default": 0,
+            "title": "Final Ready Count",
+            "type": "integer"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "has_audio": {
+            "title": "Has Audio",
+            "type": "boolean"
+          },
+          "has_video": {
+            "title": "Has Video",
+            "type": "boolean"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "latest_analysis_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview_ready_count": {
+            "default": 0,
+            "title": "Preview Ready Count",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "duration_s",
+          "has_audio",
+          "has_video",
+          "created_at"
+        ],
+        "title": "VideoSummaryOut",
+        "type": "object"
+      },
+      "WordOut": {
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "number"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker"
+          },
+          "start": {
+            "title": "Start",
+            "type": "number"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "text",
+          "start",
+          "end"
+        ],
+        "title": "WordOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1016,7 +1292,7 @@
   "info": {
     "description": "Local-first AI video clipper.",
     "title": "Clippy",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1396,6 +1672,53 @@
         ]
       }
     },
+    "/api/v1/clips/{clip_id}/transcript": {
+      "get": {
+        "operationId": "clip_transcript_api_v1_clips__clip_id__transcript_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "clip_id",
+            "required": true,
+            "schema": {
+              "title": "Clip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClipTranscriptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Clip Transcript",
+        "tags": [
+          "clips"
+        ]
+      }
+    },
     "/api/v1/exports/{export_id}/download": {
       "get": {
         "description": "Download any single export (preview or final) by its id.",
@@ -1508,6 +1831,53 @@
           }
         ],
         "summary": "Get Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/cancel": {
+      "post": {
+        "operationId": "cancel_job_api_v1_jobs__job_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel Job",
         "tags": [
           "jobs"
         ]
@@ -1894,7 +2264,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/SourceOut"
+                    "$ref": "#/components/schemas/VideoSummaryOut"
                   },
                   "title": "Response List Videos Api V1 Videos Get",
                   "type": "array"
@@ -2026,7 +2396,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceOut"
+                  "$ref": "#/components/schemas/VideoSummaryOut"
                 }
               }
             },
@@ -2100,6 +2470,108 @@
           }
         ],
         "summary": "Video Clips",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/api/v1/videos/{video_id}/media": {
+      "get": {
+        "operationId": "video_media_api_v1_videos__video_id__media_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "video_id",
+            "required": true,
+            "schema": {
+              "title": "Video Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Video Media",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/api/v1/videos/{video_id}/reanalyze": {
+      "post": {
+        "operationId": "reanalyze_video_api_v1_videos__video_id__reanalyze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "video_id",
+            "required": true,
+            "schema": {
+              "title": "Video Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobSettingsIn",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCreateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reanalyze Video",
         "tags": [
           "videos"
         ]

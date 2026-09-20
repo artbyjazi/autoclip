@@ -39,6 +39,10 @@ const sampleVideos = [
     has_audio: true,
     has_video: true,
     created_at: '2026-09-19T00:00:00+00:00',
+    latest_analysis_job: null,
+    clip_count: 0,
+    preview_ready_count: 0,
+    final_ready_count: 0,
   },
 ]
 
@@ -78,10 +82,10 @@ describe('Videos', () => {
     )
 
     renderVideos()
-    fireEvent.change(screen.getByPlaceholderText(/youtube\.com\/watch/i), {
+    fireEvent.change(screen.getByPlaceholderText(/Paste a YouTube link/i), {
       target: { value: 'https://youtube.com/watch?v=abc' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Get Clips' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Get Shorts' }))
 
     await waitFor(() => expect(screen.getByText('navigated to job job-9')).toBeTruthy())
   })

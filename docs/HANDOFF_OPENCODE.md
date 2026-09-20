@@ -1,6 +1,6 @@
-# Clippy v0.1 frontend handoff
+# Clippy v0.2 frontend handoff
 
-Backend contract freeze: `v0.1.0`.
+Backend contract freeze: `v0.2.0`.
 
 OpenCode owns frontend identity, UX, responsive behavior, and client-side tests.
 It must consume `docs/openapi-v1.json` and must not change SQLite migrations,
@@ -12,8 +12,9 @@ an opportunistic schema edit.
 
 - Base URL is the same origin as the UI.
 - Swagger is `/api/docs`; the frozen document is `/api/openapi.json`.
-- `/api/v1/health` is public. Every other `/api/v1/*` route requires
-  `Authorization: Bearer <clp_...>`.
+- `/api/v1/health` is public. Other routes accept either
+  `Authorization: Bearer <clp_...>` or a trusted `Tailscale-User-Login` header
+  injected by Tailscale Serve over the loopback proxy.
 - A new analysis finishes as `ready_for_review`. Preview and final-render jobs
   finish as `completed`.
 - Public states are `queued`, `running`, `ready_for_review`, `completed`,
@@ -23,9 +24,9 @@ an opportunistic schema edit.
   depending on the active path. Clients must display unknown future values.
 - SSE is at `GET /api/v1/jobs/{id}/events`. Reconnect after a network break and
   always re-fetch the job because SQLite is authoritative.
-- Analysis never renders every clip. Use the preview and render endpoints only
-  after the user selects a clip.
-- v0.1 exports are always 9:16. Preview is 540x960; final is 1080x1920.
+- Analysis queues one lightweight preview for every ranked clip. Final renders
+  remain on demand.
+- v0.2 exports are always 9:16. Preview is 540x960; final is 1080x1920.
 
 ## Required frontend flow
 

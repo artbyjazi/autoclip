@@ -63,6 +63,9 @@ class ClipSettings(BaseModel):
     min_duration_s: float = 20.0
     max_duration_s: float = 90.0
     max_clips: int = 10
+    #: Queue a lightweight 540x960 preview for every ranked clip once analysis
+    #: reaches review readiness. Finals remain explicitly on demand.
+    auto_preview: bool = True
 
 
 class IngestSettings(BaseModel):

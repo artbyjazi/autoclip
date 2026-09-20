@@ -6,7 +6,7 @@ port, with a pipeline that turns long video into short clips.
 ```
                      ┌──────────────────────────────────────┐
   browser  ◀────────▶│ FastAPI (backend/clippy/app.py)      │
-                     │  · /api/v1/*     Bearer REST + SSE   │
+                     │  · /api/v1/*     access REST + SSE   │
                      │  · /*            built React bundle  │
                      └───────────────┬──────────────────────┘
                                      │
@@ -18,7 +18,7 @@ port, with a pipeline that turns long video into short clips.
    │ PipelineRunner                                                    │
    │                                                                   │
    │  download → audio → ASR chunks → shortlist → LLM → reframe        │
-   │                                      then preview/render on demand │
+   │                                then auto-preview/final on demand  │
    │                                                                   │
    │  each stage writes artifacts to work/{job_id}/                    │
    └───────────────────────────────────────────────────────────────────┘
@@ -47,7 +47,7 @@ backend/clippy/
 ├── cli.py            Typer CLI — doctor, clip, serve, config
 ├── paths.py          artifact layout under CLIPPY_HOME
 ├── config.py         settings + keyring/0600 secret-file storage
-├── security.py       one-time Bearer creation and SHA-256 verification
+├── security.py       Bearer verification + loopback-only Tailscale identity
 ├── storage.py        retention accounting and conservative cleanup
 ├── system.py         environment probing (ffmpeg, GPU, deps)
 ├── models.py         ML model bundle download and cache

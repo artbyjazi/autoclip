@@ -1,449 +1,135 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import { v1, type V1ClipOut, type V1SourceOut } from '../api-v1'
-import { ClipCard } from '../components/ClipCard'
+import { v1, type V1ClipOut, type V1ClipTranscriptOut, type V1VideoSummaryOut } from '../api-v1'
+import { ClipMedia } from '../components/ClipMedia'
 import { ErrorNote } from '../components/ErrorNote'
 import { ScoreRing } from '../components/ScoreRing'
 import { formatDuration } from '../format'
-import { useV1JobStream } from '../useV1JobStream'
-
-const STYLES = ['bold', 'karaoke', 'clean', 'hormozi', 'mrbeast'] as const
-
-const STYLE_BLURB: Record<string, string> = {
-  bold: 'Chunky white, heavy outline',
-  karaoke: 'Fills with colour as spoken',
-  clean: 'Minimal lower-third',
-  hormozi: 'Emphatic phrase-by-phrase',
-  mrbeast: 'High-energy outlined',
-}
-
-const BREAKDOWN_LABELS: Record<string, string> = {
-  hook: 'Hook',
-  retention: 'Retention',
-  clarity: 'Clarity',
-  insight: 'Insight',
-  emotion: 'Emotion',
-  surprise: 'Surprise',
-  energy: 'Energy',
-  standalone_context: 'Standalone',
-  complete_thought: 'Complete thought',
-  payoff: 'Payoff',
-}
 
 type Filter = 'all' | 'kept' | 'discarded'
+type DurationFilter = 'all' | 'under30' | '30to60' | 'over60'
+type Sort = 'score' | 'time'
 
 export function Review() {
   const { videoId } = useParams()
-  const [video, setVideo] = useState<V1SourceOut | null>(null)
+  const [video, setVideo] = useState<V1VideoSummaryOut | null>(null)
   const [clips, setClips] = useState<V1ClipOut[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
+  const [duration, setDuration] = useState<DurationFilter>('all')
+  const [sort, setSort] = useState<Sort>('score')
   const [error, setError] = useState<Error | null>(null)
-  const [previewJobId, setPreviewJobId] = useState<string | null>(null)
-  const [renderJobId, setRenderJobId] = useState<string | null>(null)
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
-  const [mediaBusy, setMediaBusy] = useState(false)
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!videoId) return
-    void Promise.all([v1.getVideo(videoId), v1.listClips(videoId)])
-      .then(([loadedVideo, loadedClips]) => {
-        setVideo(loadedVideo)
-        const ranked = [...loadedClips].sort((a, b) => b.score - a.score)
-        setClips(ranked)
-        setSelectedId((current) => current ?? ranked[0]?.id ?? null)
-      })
-      .catch((err) => setError(err as Error))
+    const [loadedVideo, loadedClips] = await Promise.all([v1.getVideo(videoId), v1.listClips(videoId)])
+    setVideo(loadedVideo)
+    setClips(loadedClips)
   }, [videoId])
 
-  useEffect(() => () => {
-    if (mediaUrl) URL.revokeObjectURL(mediaUrl)
-  }, [mediaUrl])
+  useEffect(() => { void refresh().catch((err) => setError(err as Error)) }, [refresh])
+  useEffect(() => {
+    if (!clips.some((clip) => ['missing', 'queued', 'running'].includes(clip.preview.status))) return
+    const timer = window.setInterval(() => void refresh().catch(() => undefined), 2500)
+    return () => window.clearInterval(timer)
+  }, [clips, refresh])
 
-  const selected = useMemo(
-    () => clips.find((clip) => clip.id === selectedId) ?? null,
-    [clips, selectedId],
-  )
+  const visible = useMemo(() => clips.filter((clip) => {
+    if (filter !== 'all' && clip.status !== filter) return false
+    if (duration === 'under30' && clip.duration_s >= 30) return false
+    if (duration === '30to60' && (clip.duration_s < 30 || clip.duration_s > 60)) return false
+    if (duration === 'over60' && clip.duration_s <= 60) return false
+    return true
+  }).sort((a, b) => sort === 'score' ? b.score - a.score : a.start_s - b.start_s), [clips, filter, duration, sort])
 
-  const visible = useMemo(() => {
-    if (filter === 'all') return clips
-    return clips.filter((clip) => clip.status === filter)
-  }, [clips, filter])
+  const changed = (updated: V1ClipOut) => setClips((current) => current.map((clip) => clip.id === updated.id ? updated : clip))
+  const previewsReady = clips.filter((clip) => clip.preview.status === 'ready').length
 
-  const patchClip = useCallback((updated: V1ClipOut) => {
-    setClips((current) => current.map((clip) => (clip.id === updated.id ? updated : clip)))
-  }, [])
-
-  const refreshClip = useCallback(
-    async (id: string) => {
-      patchClip(await v1.getClip(id))
-    },
-    [patchClip],
-  )
-
-  const loadMedia = useCallback(async () => {
-    if (!selected) return
-    setMediaBusy(true)
-    setError(null)
-    try {
-      const url = await v1.downloadBlob(selected.id)
-      setMediaUrl((current) => {
-        if (current) URL.revokeObjectURL(current)
-        return url
-      })
-    } catch (err) {
-      setError(err as Error)
-    } finally {
-      setMediaBusy(false)
-    }
-  }, [selected])
-
-  const select = (id: string) => {
-    setSelectedId(id)
-    setPreviewJobId(null)
-    setRenderJobId(null)
-  }
-
-  if (error && clips.length === 0) {
-    return (
-      <div className="pt-24">
-        <ErrorNote error={error} onDismiss={() => setError(null)} />
-        <p className="mt-4 text-sm text-ink-500">
-          <Link to="/" className="text-iris-600 underline underline-offset-4">
-            Back to videos
-          </Link>
-        </p>
-      </div>
-    )
-  }
+  if (error && clips.length === 0) return <div className="pt-20"><ErrorNote error={error} /><Link className="mt-4 inline-block text-iris-600" to="/">Back to projects</Link></div>
 
   return (
-    <div className="pt-10">
-      <p className="eyebrow">
-        <Link to="/" className="hover:text-iris-600">
-          Videos
-        </Link>{' '}
-        / Review
-      </p>
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-        <h1 className="max-w-3xl truncate font-display text-[clamp(1.75rem,4vw,2.75rem)] leading-tight text-ink-900">
-          {video?.title || 'Loading…'}
-        </h1>
-        {video && (
-          <p className="numeric text-xs text-ink-500">
-            {formatDuration(video.duration_s)} · {video.channel ?? ''} · {clips.length} clips
-          </p>
-        )}
+    <div className="mx-auto max-w-5xl pt-10">
+      <p className="eyebrow"><Link to="/" className="hover:text-iris-600">Projects</Link> / Results</p>
+      <div className="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div><h1 className="max-w-3xl font-display text-[clamp(1.8rem,4vw,2.8rem)] leading-tight text-ink-900">{video?.title || 'Loading…'}</h1>{video && <p className="numeric mt-2 text-xs text-ink-500">{formatDuration(video.duration_s)} · {video.channel || 'YouTube'} · {clips.length} clips</p>}</div>
+        {video && <a href={v1.sourceMediaUrl(video.id)} target="_blank" rel="noreferrer" className="btn btn-ghost text-sm">View original video</a>}
       </div>
 
-      {error && (
-        <div className="mt-6 max-w-3xl">
-          <ErrorNote error={error} onDismiss={() => setError(null)} />
-        </div>
-      )}
+      {clips.length > 0 && previewsReady < clips.length && <div className="card mt-6 flex items-center gap-4 p-4"><span className="size-2 animate-pulse rounded-full bg-iris-600" /><div className="flex-1"><p className="text-sm font-semibold">Preparing previews {previewsReady}/{clips.length}</p><div className="meter mt-2"><span style={{ width: `${clips.length ? previewsReady / clips.length * 100 : 0}%` }} /></div></div></div>}
+      {error && <div className="mt-5"><ErrorNote error={error} onDismiss={() => setError(null)} /></div>}
 
-      {/* Filter */}
-      <div className="mt-8 flex gap-2">
-        {(['all', 'kept', 'discarded'] as const).map((option) => (
-          <button
-            key={option}
-            onClick={() => setFilter(option)}
-            className={[
-              'btn text-sm capitalize',
-              filter === option ? 'btn-primary' : 'btn-ghost',
-            ].join(' ')}
-          >
-            {option}
-          </button>
-        ))}
+      <div className="mt-7 flex flex-wrap items-center gap-2">
+        {(['all', 'kept', 'discarded'] as const).map((item) => <button key={item} onClick={() => setFilter(item)} className={`btn text-sm capitalize ${filter === item ? 'btn-primary' : 'btn-ghost'}`}>{item}</button>)}
+        <select aria-label="Filter clips by duration" className="field ml-auto w-auto min-w-40 text-sm" value={duration} onChange={(event) => setDuration(event.target.value as DurationFilter)}><option value="all">Any length</option><option value="under30">Under 30 sec</option><option value="30to60">30–60 sec</option><option value="over60">Over 60 sec</option></select>
+        <select aria-label="Sort clips" className="field w-auto min-w-36 text-sm" value={sort} onChange={(event) => setSort(event.target.value as Sort)}><option value="score">Sort by score</option><option value="time">Sort by time</option></select>
       </div>
 
-      {/* Grid */}
-      {visible.length === 0 ? (
-        <div className="card mt-6 p-8 text-center">
-          <p className="text-sm text-ink-500">
-            {clips.length === 0
-              ? 'No clips yet — the analysis may still be running.'
-              : 'No clips with this status.'}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {visible.map((clip, index) => (
-            <div key={clip.id} className="rise" style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}>
-              <ClipCard clip={clip} selected={clip.id === selectedId} onSelect={() => select(clip.id)} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Detail */}
-      {selected && (
-        <section className="card mt-8 p-5 sm:p-8">
-          <ClipDetail
-            clip={selected}
-            onChanged={patchClip}
-            onError={setError}
-            previewJobId={previewJobId}
-            renderJobId={renderJobId}
-            onPreview={(jobId) => {
-              setPreviewJobId(jobId)
-              setRenderJobId(null)
-            }}
-            onRender={(jobId) => {
-              setRenderJobId(jobId)
-              setPreviewJobId(null)
-            }}
-            onPreviewDone={() => void refreshClip(selected.id)}
-            onRenderDone={() => void refreshClip(selected.id)}
-            mediaUrl={mediaUrl}
-            mediaBusy={mediaBusy}
-            onLoadMedia={() => void loadMedia()}
-          />
-        </section>
-      )}
+      <div className="mt-7 space-y-8">
+        {visible.map((clip) => <ClipResultRow key={clip.id} clip={clip} onChanged={changed} onRefresh={() => void refresh()} onError={setError} />)}
+        {visible.length === 0 && <div className="card p-10 text-center text-sm text-ink-500">No clips match these filters.</div>}
+      </div>
     </div>
   )
 }
 
-function ClipDetail({
-  clip,
-  onChanged,
-  onError,
-  previewJobId,
-  renderJobId,
-  onPreview,
-  onRender,
-  onPreviewDone,
-  onRenderDone,
-  mediaUrl,
-  mediaBusy,
-  onLoadMedia,
-}: {
-  clip: V1ClipOut
-  onChanged: (clip: V1ClipOut) => void
-  onError: (err: Error) => void
-  previewJobId: string | null
-  renderJobId: string | null
-  onPreview: (jobId: string) => void
-  onRender: (jobId: string) => void
-  onPreviewDone: () => void
-  onRenderDone: () => void
-  mediaUrl: string | null
-  mediaBusy: boolean
-  onLoadMedia: () => void
-}) {
-  const [title, setTitle] = useState(clip.title)
-  const [start, setStart] = useState(String(Math.round(clip.start_s * 100) / 100))
-  const [end, setEnd] = useState(String(Math.round(clip.end_s * 100) / 100))
-  const [style, setStyle] = useState(clip.caption_style || 'bold')
+function ClipResultRow({ clip, onChanged, onRefresh, onError }: { clip: V1ClipOut; onChanged: (clip: V1ClipOut) => void; onRefresh: () => void; onError: (error: Error) => void }) {
+  const [transcript, setTranscript] = useState<V1ClipTranscriptOut | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
-  useEffect(() => {
-    setTitle(clip.title)
-    setStart(String(Math.round(clip.start_s * 100) / 100))
-    setEnd(String(Math.round(clip.end_s * 100) / 100))
-    setStyle(clip.caption_style || 'bold')
-  }, [clip.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void v1.clipTranscript(clip.id).then(setTranscript).catch(() => undefined) }, [clip.id, clip.start_s, clip.end_s])
 
-  const run = async (kind: string, fn: () => Promise<unknown>) => {
-    setBusy(kind)
-    try {
-      await fn()
-    } catch (err) {
-      onError(err as Error)
-    } finally {
-      setBusy(null)
-    }
+  const setStatus = async (status: 'kept' | 'discarded') => {
+    setBusy(status)
+    try { onChanged(await v1.patchClip(clip.id, { status })) } catch (err) { onError(err as Error) } finally { setBusy(null) }
   }
 
-  const saveMeta = () =>
-    run('meta', async () => {
-      const start_s = Number(start)
-      const end_s = Number(end)
-      if (!Number.isFinite(start_s) || !Number.isFinite(end_s) || end_s <= start_s) {
-        throw new Error('Trim range is invalid: end must be after start.')
+  const download = async () => {
+    setBusy('download')
+    try {
+      if (clip.final.status !== 'ready') {
+        const job = await v1.renderClip(clip.id, clip.caption_style)
+        await waitForJob(job.id)
       }
-      onChanged(await v1.patchClip(clip.id, { title, start_s, end_s }))
-    })
-
-  const setStatus = (status: string) =>
-    run('status', async () => {
-      onChanged(await v1.patchClip(clip.id, { status }))
-    })
-
-  const preview = () =>
-    run('preview', async () => {
-      const job = await v1.previewClip(clip.id, STYLES.includes(style as (typeof STYLES)[number]) ? style : 'bold')
-      onPreview(job.id)
-    })
-
-  const render = () =>
-    run('render', async () => {
-      const job = await v1.renderClip(clip.id)
-      onRender(job.id)
-    })
-
-  const breakdown = Object.entries(clip.score_breakdown ?? {})
+      const url = await v1.downloadBlob(clip.id)
+      const anchor = document.createElement('a')
+      anchor.href = url; anchor.download = `${clip.title || 'clip'}.mp4`; anchor.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      onRefresh()
+    } catch (err) { onError(err as Error) } finally { setBusy(null) }
+  }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      {/* Player column */}
-      <div>
-        {mediaUrl ? (
-          <video key={mediaUrl} controls playsInline src={mediaUrl} className="aspect-[9/16] max-h-[70vh] w-full rounded-xl bg-ink-900 object-contain" />
-        ) : (
-          <div className="thumb flex min-h-72 items-center justify-center">
-            <div className="text-center">
-              <ScoreRing score={clip.score} size={72} />
-              <p className="mt-3 px-6 text-xs text-ink-500">
-                {mediaBusy ? 'Loading video…' : 'Load the final render to watch it here.'}
-              </p>
-            </div>
+    <article className="card p-4 sm:p-6">
+      <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
+        <ClipMedia artifact={clip.preview} title={clip.title} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start gap-3"><div><p className="eyebrow">#{clip.rank}</p><h2 className="mt-1 text-lg font-bold text-ink-900">{clip.title}</h2></div><div className="ml-auto"><ScoreRing score={clip.score} size={54} /></div></div>
+          <div className="mt-2 flex flex-wrap gap-2"><span className="badge numeric">{formatDuration(clip.start_s)}–{formatDuration(clip.end_s)}</span><span className="badge">{clip.status}</span>{clip.degraded && <span className="badge badge-warn">heuristic</span>}<span className={`badge numeric ${clip.preview.status === 'ready' ? 'badge-good' : clip.preview.status === 'failed' ? 'badge-bad' : 'badge-iris'}`}>preview: {clip.preview.status}</span><span className={`badge numeric ${clip.final.status === 'ready' ? 'badge-good' : clip.final.status === 'failed' ? 'badge-bad' : ''}`}>final: {clip.final.status}</span></div>
+          <p className="mt-4 font-display text-lg italic text-ink-900">“{clip.hook}”</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-500">{clip.reason}</p>
+          {transcript && <div className="mt-4 rounded-xl bg-paper p-4"><p className={`text-sm leading-relaxed text-ink-700 ${expanded ? '' : 'line-clamp-4'}`}>{transcript.text}</p>{transcript.text.length > 220 && <button className="mt-2 text-xs font-semibold text-iris-600" onClick={() => setExpanded((value) => !value)}>{expanded ? 'Show less' : 'Read transcript'}</button>}</div>}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button className="btn btn-ghost text-sm" disabled={busy !== null} onClick={() => void setStatus('kept')}>Keep</button>
+            <button className="btn btn-quiet text-sm" disabled={busy !== null} onClick={() => void setStatus('discarded')}>Discard</button>
+            <Link className="btn btn-ghost text-sm" to={`/clips/${clip.id}/edit`}>Edit</Link>
+            <button className="btn btn-primary text-sm" disabled={busy !== null || ['queued', 'running'].includes(clip.preview.status)} onClick={() => void download()}>{busy === 'download' ? 'Rendering…' : clip.final.status === 'ready' ? 'Download MP4' : 'Render & download'}</button>
           </div>
-        )}
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button onClick={onLoadMedia} disabled={mediaBusy} className="btn btn-ghost text-sm">
-            {mediaBusy ? 'Loading…' : mediaUrl ? 'Reload video' : 'Load video'}
-          </button>
-          {mediaUrl && (
-            <a href={mediaUrl} download={`${clip.title || 'clip'}.mp4`} className="btn btn-primary text-sm">
-              Download MP4
-            </a>
-          )}
+          {clip.preview.status === 'failed' && <p className="mt-3 text-xs text-signal-bad">Preview failed: {clip.preview.error} — you can still render the final file.</p>}
+          {clip.preview.status === 'stale' && <p className="mt-3 text-xs text-signal-warn">This preview predates your latest trim or caption change.</p>}
+          {clip.final.status === 'stale' && <p className="mt-3 text-xs text-signal-warn">A final file exists but predates your latest edit — downloading will render a fresh one.</p>}
         </div>
       </div>
-
-      {/* Data column */}
-      <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <ScoreRing score={clip.score} size={56} />
-          <div className="flex flex-wrap gap-2">
-            {clip.degraded && (
-              <span className="badge badge-warn" title="All LLM targets failed; heuristic fallback">
-                degraded
-              </span>
-            )}
-            {clip.provider_target && (
-              <span className="badge numeric">{clip.provider_target}</span>
-            )}
-            <span className="badge">{clip.status}</span>
-            <span className="badge numeric">
-              {formatDuration(clip.start_s)}–{formatDuration(clip.end_s)}
-            </span>
-          </div>
-        </div>
-
-        <p className="mt-4 font-display text-xl italic leading-snug text-ink-900">“{clip.hook}”</p>
-        <p className="mt-2 text-sm leading-relaxed text-ink-500">{clip.reason}</p>
-
-        {breakdown.length > 0 && (
-          <div className="mt-6 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-            {breakdown.map(([key, value]) => (
-              <div key={key}>
-                <div className="flex items-baseline justify-between gap-2 text-xs">
-                  <span className="text-ink-500">{BREAKDOWN_LABELS[key] ?? key}</span>
-                  <span className="numeric font-semibold text-ink-900">{value}</span>
-                </div>
-                <div className="meter mt-1.5">
-                  <span style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Title + trim */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_6.5rem_6.5rem_auto]">
-          <label className="block">
-            <span className="eyebrow">Title</span>
-            <input className="field mt-1 text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="eyebrow">Start (s)</span>
-            <input type="number" step="0.1" min={0} className="field numeric mt-1 text-sm" value={start} onChange={(e) => setStart(e.target.value)} />
-          </label>
-          <label className="block">
-            <span className="eyebrow">End (s)</span>
-            <input type="number" step="0.1" min={0} className="field numeric mt-1 text-sm" value={end} onChange={(e) => setEnd(e.target.value)} />
-          </label>
-          <div className="flex items-end">
-            <button onClick={() => void saveMeta()} disabled={busy !== null} className="btn btn-ghost text-sm">
-              {busy === 'meta' ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          <button onClick={() => void setStatus('kept')} disabled={busy !== null} className="btn btn-ghost text-sm">
-            Keep
-          </button>
-          <button onClick={() => void setStatus('discarded')} disabled={busy !== null} className="btn btn-quiet text-sm">
-            Discard
-          </button>
-        </div>
-
-        {/* Styles */}
-        <div className="mt-6">
-          <span className="eyebrow">Caption style</span>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {STYLES.map((key) => (
-              <button
-                key={key}
-                onClick={() => setStyle(key)}
-                className={[
-                  'rounded-xl border p-3 text-left transition-shadow',
-                  style === key ? 'border-iris-600 shadow-pop' : 'border-line bg-card hover:shadow-card',
-                ].join(' ')}
-                aria-pressed={style === key}
-              >
-                <span className="block aspect-[9/16] overflow-hidden rounded-lg bg-ink-900 p-2">
-                  <span className="mt-6 block text-center font-display text-sm font-bold uppercase leading-tight text-white">
-                    {key === 'karaoke' ? <span className="text-iris-500">Keep</span> : 'Keep'} watching
-                  </span>
-                </span>
-                <span className="mt-2 block text-xs font-semibold capitalize text-ink-900">{key}</span>
-                <span className="block text-[0.6875rem] leading-snug text-ink-500">{STYLE_BLURB[key]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Preview / render */}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button onClick={() => void preview()} disabled={busy !== null} className="btn btn-ghost text-sm" title="540×960 lightweight H.264">
-            {busy === 'preview' ? 'Queueing…' : 'Preview'}
-          </button>
-          <button onClick={() => void render()} disabled={busy !== null} className="btn btn-primary text-sm" title="1080×1920 final">
-            {busy === 'render' ? 'Queueing…' : 'Render final'}
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-ink-400">Preview is 540×960 ultrafast; final is 1080×1920, always 9:16.</p>
-
-        {previewJobId && <JobFollow jobId={previewJobId} label="Preview" onDone={onPreviewDone} />}
-        {renderJobId && <JobFollow jobId={renderJobId} label="Render" onDone={onRenderDone} />}
-      </div>
-    </div>
+    </article>
   )
 }
 
-/** Follows one preview/render job inline until it reaches a terminal state. */
-function JobFollow({ jobId, label, onDone }: { jobId: string; label: string; onDone: () => void }) {
-  const { job, progress } = useV1JobStream(jobId)
-  const firedRef = useRef(false)
-
-  useEffect(() => {
-    if (job && ['completed', 'failed', 'cancelled'].includes(job.status) && !firedRef.current) {
-      firedRef.current = true
-      if (job.status === 'completed') onDone()
-    }
-  }, [job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const percent = Math.round(((progress?.overall ?? job?.progress) ?? 0) * 100)
-  return (
-    <p className="numeric mt-3 text-xs text-ink-500">
-      {label}: {job?.status ?? 'queued'} · {percent}%{job?.error ? ` · ${job.error}` : ''}
-    </p>
-  )
+async function waitForJob(jobId: string): Promise<void> {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    const job = await v1.getJob(jobId)
+    if (job.status === 'completed') return
+    if (job.status === 'failed' || job.status === 'cancelled') throw new Error(job.error || `Render ${job.status}.`)
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+  }
+  throw new Error('Render timed out.')
 }

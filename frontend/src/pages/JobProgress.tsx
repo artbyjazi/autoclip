@@ -1,21 +1,20 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import { v1 } from '../api-v1'
 import { ErrorNote } from '../components/ErrorNote'
 import { formatDuration } from '../format'
-import { useV1JobStream } from '../useV1JobStream'
+import { useV1JobStream, type V1StageProgress } from '../useV1JobStream'
+import type { V1JobOut } from '../api-v1'
 
 /** v1 current_stage values in pipeline order, per docs/HANDOFF_OPENCODE.md. */
 const STAGES = [
   { key: 'download', label: 'Download', note: 'Fetching the source video' },
-  { key: 'audio', label: 'Audio', note: 'Extracting mono 16 kHz audio' },
-  { key: 'transcription', label: 'Transcribe', note: 'Word-level timing, cloud first' },
-  { key: 'candidates', label: 'Candidates', note: 'Heuristic shortlist, top 20' },
-  { key: 'analysis', label: 'Analysis', note: 'LLM evaluation with failover' },
-  { key: 'ranking', label: 'Ranking', note: 'Virality scores and dedup' },
+  { key: 'prepare', label: 'Prepare audio', note: 'Extracting mono 16 kHz audio' },
+  { key: 'transcribe', label: 'Transcribe', note: 'Word-level timing, cloud first' },
+  { key: 'highlights', label: 'Find highlights', note: 'Candidates, AI analysis and ranking' },
   { key: 'reframe', label: 'Reframe', note: 'Tracking the speaker into vertical' },
-  { key: 'preview', label: 'Preview', note: '540×960 lightweight render' },
-  { key: 'render', label: 'Render', note: '1080×1920 final render' },
+  { key: 'captions', label: 'Captions', note: 'Validating the selected caption style' },
   { key: 'ready_for_review', label: 'Ready', note: 'Clips ranked, awaiting review' },
 ] as const
 
@@ -24,7 +23,7 @@ const TERMINAL_GOOD = new Set(['ready_for_review', 'completed'])
 export function JobProgress() {
   const { jobId } = useParams()
   const navigate = useNavigate()
-  const { job, progress, connected } = useV1JobStream(jobId)
+  const { job, progress, connected, setJob } = useV1JobStream(jobId)
 
   useEffect(() => {
     if (job && TERMINAL_GOOD.has(job.status) && job.kind === 'analysis') {
@@ -42,7 +41,20 @@ export function JobProgress() {
     )
   }
 
-  const activeIndex = STAGES.findIndex((s) => s.key === job.current_stage)
+  const cancel = async () => { if (jobId) setJob(await v1.cancelJob(jobId)) }
+  const retry = async () => { if (jobId) setJob(await v1.retryJob(jobId)) }
+
+  return <JobProgressContent job={job} progress={progress} connected={connected} onCancel={cancel} onRetry={retry} onReview={() => navigate(`/videos/${job.source_id}/clips`)} />
+}
+
+function JobProgressContent({ job, progress, connected, onCancel, onRetry, onReview }: {
+  job: V1JobOut
+  progress: V1StageProgress | null
+  connected: boolean
+  onCancel: () => Promise<void>
+  onRetry: () => Promise<void>
+  onReview: () => void
+}) {
   const percent = Math.round((progress?.overall ?? job.progress) * 100)
   const failed = job.status === 'failed' || job.status === 'cancelled'
 
@@ -72,10 +84,12 @@ export function JobProgress() {
         </div>
 
         {TERMINAL_GOOD.has(job.status) && (
-          <button onClick={() => navigate(`/videos/${job.source_id}/clips`)} className="btn btn-primary mt-6">
+          <button type="button" onClick={onReview} className="btn btn-primary mt-6">
             Review clips
           </button>
         )}
+        {!TERMINAL_GOOD.has(job.status) && !failed && <button type="button" onClick={() => void onCancel()} className="btn btn-ghost mt-6">Cancel</button>}
+        {failed && <button type="button" onClick={() => void onRetry()} className="btn btn-primary mt-6">Retry from {job.current_stage || 'last stage'}</button>}
       </div>
 
       {job.error && (
@@ -87,52 +101,40 @@ export function JobProgress() {
         </div>
       )}
 
-      <ol className="card mt-6 p-2">
-        {STAGES.map((stage, index) => {
-          const failedHere = failed && index === activeIndex
-          const state =
-            TERMINAL_GOOD.has(job.status) || (activeIndex >= 0 && index < activeIndex)
-              ? 'done'
-              : failedHere
-                ? 'stopped'
-                : index === activeIndex && job.status === 'running'
-                  ? 'active'
-                  : 'pending'
-
-          return (
-            <li
-              key={stage.key}
-              className={[
-                'flex items-center gap-4 rounded-xl px-4 py-3',
-                state === 'active' ? 'bg-iris-50' : '',
-              ].join(' ')}
-            >
-              <span
-                className={[
-                  'numeric flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                  state === 'done'
-                    ? 'bg-signal-good-bg text-signal-good'
-                    : state === 'stopped'
-                      ? 'bg-signal-bad-bg text-signal-bad'
-                      : state === 'active'
-                        ? 'bg-iris-600 text-white'
-                        : 'bg-paper text-ink-400',
-                ].join(' ')}
-              >
-                {state === 'done' ? '✓' : state === 'stopped' ? '✕' : index + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className={['text-sm font-semibold', state === 'pending' ? 'text-ink-400' : 'text-ink-900'].join(' ')}>
-                  {stage.label}
-                </p>
-                <p className="truncate text-xs text-ink-500">
-                  {state === 'active' ? (progress?.message ?? stage.note) : stage.note}
-                </p>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
+      <StageList job={job} progress={progress} />
     </div>
   )
+}
+
+function StageList({ job, progress }: { job: V1JobOut; progress: V1StageProgress | null }) {
+  const activeIndex = STAGES.findIndex((stage) => stage.key === job.current_stage)
+  const failed = job.status === 'failed' || job.status === 'cancelled'
+  return <ol className="card mt-6 p-2">{STAGES.map((stage, index) => {
+    const state = stageState(job.status, activeIndex, index, failed)
+    return <li key={stage.key} className={`flex items-center gap-4 rounded-xl px-4 py-3 ${state === 'active' ? 'bg-iris-50' : ''}`}>
+      <span className={`numeric flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${stageBadgeClass(state)}`}>
+        {state === 'done' ? '✓' : state === 'stopped' ? '✕' : index + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-semibold ${state === 'pending' ? 'text-ink-400' : 'text-ink-900'}`}>{stage.label}</p>
+        <p className="truncate text-xs text-ink-500">{state === 'active' ? (progress?.message ?? stage.note) : stage.note}</p>
+      </div>
+    </li>
+  })}</ol>
+}
+
+type StageState = 'done' | 'stopped' | 'active' | 'pending'
+
+function stageState(status: string, activeIndex: number, index: number, failed: boolean): StageState {
+  if (TERMINAL_GOOD.has(status) || (activeIndex >= 0 && index < activeIndex)) return 'done'
+  if (failed && index === activeIndex) return 'stopped'
+  if (index === activeIndex && status === 'running') return 'active'
+  return 'pending'
+}
+
+function stageBadgeClass(state: StageState): string {
+  if (state === 'done') return 'bg-signal-good-bg text-signal-good'
+  if (state === 'stopped') return 'bg-signal-bad-bg text-signal-bad'
+  if (state === 'active') return 'bg-iris-600 text-white'
+  return 'bg-paper text-ink-400'
 }

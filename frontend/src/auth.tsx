@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
 
 import { getToken, setToken, v1 } from './api-v1'
 
@@ -56,18 +55,21 @@ export function TokenProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/**
- * Blocks v1 pages until a Bearer token is stored. The legacy settings page
- * stays reachable without a token until its own C6 migration.
- */
+/** Trust Tailscale identity by default; show a Bearer-key fallback after a 401. */
 export function AuthGate({ children }: { children: ReactNode }) {
   const { token, save } = useToken()
-  const location = useLocation()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  const [needsKey, setNeedsKey] = useState(false)
 
-  if (token || location.pathname.startsWith('/settings')) return <>{children}</>
+  useEffect(() => {
+    const onUnauthorized = () => setNeedsKey(true)
+    window.addEventListener('clippy:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('clippy:unauthorized', onUnauthorized)
+  }, [])
+
+  if (token || !needsKey) return <>{children}</>
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -76,6 +78,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       await save(input)
       setInput('')
+      setNeedsKey(false)
     } catch (err) {
       setError(err as Error)
     } finally {
@@ -86,13 +89,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto max-w-xl pt-14">
       <div className="rise card p-6 sm:p-10">
-        <p className="eyebrow">Private · Bearer required</p>
+        <p className="eyebrow">Local development fallback</p>
         <h1 className="mt-4 font-display text-[clamp(2rem,5vw,3rem)] leading-[1.02] text-ink-900">
           Paste your <span className="italic text-iris-600">API key</span>.
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-ink-500">
-          Every <span className="numeric">/api/v1/*</span> route except health needs a Bearer
-          key. Create one on the server with{' '}
+          Tailscale signs you in automatically in production. This connection has no trusted
+          Tailscale identity, so use an integration key created with{' '}
           <code className="numeric text-ink-900">clippy api-key create --name laptop</code>{' '}
           — the value is shown once. It stays in this tab&apos;s session storage, never in a
           log.

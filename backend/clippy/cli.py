@@ -724,7 +724,7 @@ def serve(
     if host == "0.0.0.0":  # noqa: S104
         console.print(
             "[yellow]Binding to 0.0.0.0 exposes Clippy to your whole network.[/yellow] "
-            "The deprecated UI API has no Bearer auth; keep this behind Tailscale."
+            "Tailscale identity headers are only trusted on a loopback bind."
         )
 
     if open_browser and not reload:
@@ -737,6 +737,11 @@ def serve(
         port=port,
         reload=reload,
         log_level="info",
+        # Preserve the actual TCP peer. Tailscale Serve connects from loopback
+        # and supplies the original client in X-Forwarded-For; accepting
+        # Uvicorn's default rewrite would hide the loopback trust boundary used
+        # by require_access().
+        proxy_headers=False,
     )
 
 

@@ -22,6 +22,8 @@ const sampleClip: V1ClipOut = {
   caption_style: 'bold',
   ratio: '9:16',
   exports: [],
+  preview: { status: 'missing', job_id: null, export: null, error: null },
+  final: { status: 'missing', job_id: null, export: null, error: null },
 }
 
 afterEach(() => cleanup())

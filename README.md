@@ -28,11 +28,12 @@ the server.
 
 ## Status
 
-The v0.1 backend provides durable analysis/preview/render jobs, resumable ASR,
-hybrid ranking, 9:16 CPU rendering, Bearer-authenticated API v1, provider
+Clippy v0.2 provides durable analysis/preview/render jobs, resumable ASR,
+hybrid ranking, automatic 9:16 previews, on-demand 1080×1920 finals, provider
 failover, retention cleanup, and private Tailscale deployment. The bundled UI
-talks exclusively to the Bearer-authenticated API v1; see
-[HANDOFF_OPENCODE.md](docs/HANDOFF_OPENCODE.md) for the frozen contract.
+uses Tailscale Serve identity when deployed privately, while API v1 keeps
+Bearer keys for n8n, agents, Swagger, and other integrations. See
+[HANDOFF_OPENCODE.md](docs/HANDOFF_OPENCODE.md) for the frontend contract.
 
 Pre-1.0. The clip *picks* haven't been judged against a fixed golden set — that's a
 matter of taste about your material and your model, and no test settles it.
@@ -94,7 +95,10 @@ clippy doctor
 clippy serve
 ```
 
-That opens `http://localhost:8000`. If you don't use [uv](https://docs.astral.sh/uv/), a plain `python -m venv .venv` and `pip install -e ".[dev]"` works the same way.
+That opens `http://localhost:8000`. Local development asks for a Bearer key on
+the first unauthorized request; a Tailscale Serve deployment signs the user in
+from its identity header instead. If you don't use [uv](https://docs.astral.sh/uv/),
+a plain `python -m venv .venv` and `pip install -e ".[dev]"` works the same way.
 
 ### Add a provider
 
@@ -192,7 +196,9 @@ Everything here is a real failure hit during development, not hypothetical.
 ```
 download → audio → transcription → candidates → analysis → ranking → reframe
                                                         ↓
-                                              review → preview/render
+                                              review → automatic previews
+                                                           ↓
+                                                  edit → final on demand
 ```
 
 Each stage writes artifacts to `~/.clippy/work/{job_id}/`, so a retry resumes at the stage that failed rather than starting over. Two decisions carry most of the design:

@@ -66,6 +66,7 @@ class JobSettingsIn(BaseModel):
     min_duration_s: float | None = Field(default=None, gt=0)
     max_duration_s: float | None = Field(default=None, gt=0)
     max_clips: int | None = Field(default=None, ge=1, le=50)
+    auto_preview: bool | None = None
     caption_style: str | None = None
     ratio: Literal["9:16", "1:1", "16:9"] | None = None
 
@@ -124,6 +125,7 @@ class JobOut(BaseModel):
 
 
 class WordOut(BaseModel):
+    index: int
     text: str
     start: float
     end: float
@@ -154,6 +156,18 @@ class ExportOut(BaseModel):
         )
 
 
+class ArtifactStateOut(BaseModel):
+    status: Literal["missing", "queued", "running", "ready", "stale", "failed", "cancelled"]
+    job_id: str | None = None
+    export: ExportOut | None = None
+    error: str | None = None
+
+
+class ClipTranscriptOut(BaseModel):
+    text: str
+    words: list[WordOut]
+
+
 class ClipOut(BaseModel):
     id: str
     job_id: str
@@ -176,6 +190,8 @@ class ClipOut(BaseModel):
     caption_style: str = "bold_pop"
     ratio: str = "9:16"
     exports: list[ExportOut] = Field(default_factory=list)
+    preview: ArtifactStateOut = Field(default_factory=lambda: ArtifactStateOut(status="missing"))
+    final: ArtifactStateOut = Field(default_factory=lambda: ArtifactStateOut(status="missing"))
 
     @classmethod
     def of(
@@ -184,6 +200,9 @@ class ClipOut(BaseModel):
         *,
         edit: models.ClipEdit | None = None,
         exports: list[models.Export] | None = None,
+        preview: ArtifactStateOut | None = None,
+        final: ArtifactStateOut | None = None,
+        caption_style: str | None = None,
     ) -> ClipOut:
         return cls(
             id=clip.id,
@@ -204,9 +223,11 @@ class ClipOut(BaseModel):
             provider_target=clip.provider_target,
             status=clip.status,
             user_trimmed=clip.user_trimmed,
-            caption_style=edit.caption_style if edit else "bold_pop",
+            caption_style=edit.caption_style if edit else (caption_style or "bold_pop"),
             ratio=edit.ratio if edit else "9:16",
             exports=[ExportOut.of(e) for e in (exports or [])],
+            preview=preview or ArtifactStateOut(status="missing"),
+            final=final or ArtifactStateOut(status="missing"),
         )
 
 
@@ -215,6 +236,7 @@ class ClipPatchIn(BaseModel):
     end_s: float | None = Field(default=None, gt=0)
     title: str | None = None
     status: Literal["candidate", "kept", "discarded", "exported"] | None = None
+    caption_style: str | None = None
 
 
 class CaptionPatchIn(BaseModel):
@@ -286,6 +308,13 @@ class VideoCreateOut(BaseModel):
     video_id: str
     job_id: str
     status: str = "queued"
+
+
+class VideoSummaryOut(SourceOut):
+    latest_analysis_job: JobOut | None = None
+    clip_count: int = 0
+    preview_ready_count: int = 0
+    final_ready_count: int = 0
 
 
 class RenderJobIn(BaseModel):

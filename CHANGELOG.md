@@ -5,6 +5,17 @@ versions follow [semantic versioning](https://semver.org/) once 0.1.0 ships.
 
 ## Unreleased
 
+## [0.2.0] - 2026-09-20
+
+- Tailscale identity signs the web UI in automatically while Bearer keys remain
+  available for n8n, agents, Swagger, and other API clients.
+- Ssemble-style project dashboard and result rows with progressive previews,
+  transcripts, sorting, duration filters, inline actions, and final downloads.
+- Practical clip editor with transcript-backed trim, caption-style persistence,
+  score breakdown, preview regeneration, and on-demand 1080x1920 renders.
+- Automatic, idempotent preview jobs after analysis plus restart reconciliation,
+  project summaries, source streaming, cancel, and artifact-aware clip state.
+
 ## [0.1.0] - 2026-09-19
 
 Bearer-authenticated API v1 as the only REST surface, private Tailscale

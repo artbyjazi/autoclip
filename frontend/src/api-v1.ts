@@ -5,7 +5,8 @@
  * no base URL to configure and no CORS to negotiate.
  *
  * - `GET /api/v1/health` is public.
- * - Every other `/api/v1/*` route requires `Authorization: Bearer <clp_...>`.
+ * - Other routes accept either `Authorization: Bearer <clp_...>` or the
+ *   identity injected by Tailscale Serve on the loopback proxy hop.
  * - No calls to deprecated `/api/*` routes from new code.
  */
 
@@ -39,6 +40,13 @@ export interface V1SourceOut {
   created_at: string
 }
 
+export interface V1VideoSummaryOut extends V1SourceOut {
+  latest_analysis_job: V1JobOut | null
+  clip_count: number
+  preview_ready_count: number
+  final_ready_count: number
+}
+
 export interface V1JobOut {
   id: string
   source_id: string
@@ -67,6 +75,26 @@ export interface V1ExportOut {
   created_at: string
 }
 
+export interface V1ArtifactState {
+  status: 'missing' | 'queued' | 'running' | 'ready' | 'stale' | 'failed' | 'cancelled'
+  job_id: string | null
+  export: V1ExportOut | null
+  error: string | null
+}
+
+export interface V1WordOut {
+  index: number
+  text: string
+  start: number
+  end: number
+  speaker: string | null
+}
+
+export interface V1ClipTranscriptOut {
+  text: string
+  words: V1WordOut[]
+}
+
 export interface V1ClipOut {
   id: string
   job_id: string
@@ -85,6 +113,8 @@ export interface V1ClipOut {
   caption_style: string
   ratio: string
   exports: V1ExportOut[]
+  preview: V1ArtifactState
+  final: V1ArtifactState
 }
 
 export interface V1ApiKeyOut {
@@ -235,17 +265,26 @@ export const v1 = {
       body: JSON.stringify({ youtube_url, options }),
     }),
 
-  listVideos: (limit = 25) => v1request<V1SourceOut[]>(`/api/v1/videos?limit=${limit}`),
-  getVideo: (id: string) => v1request<V1SourceOut>(`/api/v1/videos/${id}`),
+  listVideos: (limit = 100) => v1request<V1VideoSummaryOut[]>(`/api/v1/videos?limit=${limit}`),
+  getVideo: (id: string) => v1request<V1VideoSummaryOut>(`/api/v1/videos/${id}`),
   deleteVideo: (id: string) =>
     v1request<void>(`/api/v1/videos/${id}`, { method: 'DELETE' }),
   listClips: (videoId: string) =>
     v1request<V1ClipOut[]>(`/api/v1/videos/${videoId}/clips`),
+  reanalyzeVideo: (videoId: string, options: Record<string, unknown> = {}) =>
+    v1request<V1VideoCreateOut>(`/api/v1/videos/${videoId}/reanalyze`, {
+      method: 'POST',
+      body: JSON.stringify(options),
+    }),
+  sourceMediaUrl: (videoId: string) => `/api/v1/videos/${videoId}/media`,
 
   getJob: (id: string) => v1request<V1JobOut>(`/api/v1/jobs/${id}`),
+  retryJob: (id: string) => v1request<V1JobOut>(`/api/v1/jobs/${id}/retry`, { method: 'POST' }),
+  cancelJob: (id: string) => v1request<V1JobOut>(`/api/v1/jobs/${id}/cancel`, { method: 'POST' }),
 
   getClip: (id: string) => v1request<V1ClipOut>(`/api/v1/clips/${id}`),
-  patchClip: (id: string, patch: { start_s?: number; end_s?: number; title?: string; status?: string }) =>
+  clipTranscript: (id: string) => v1request<V1ClipTranscriptOut>(`/api/v1/clips/${id}/transcript`),
+  patchClip: (id: string, patch: { start_s?: number; end_s?: number; title?: string; status?: string; caption_style?: string }) =>
     v1request<V1ClipOut>(`/api/v1/clips/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
@@ -255,9 +294,13 @@ export const v1 = {
       method: 'POST',
       body: JSON.stringify({ style }),
     }),
-  renderClip: (id: string) =>
-    v1request<V1JobOut>(`/api/v1/clips/${id}/render`, { method: 'POST' }),
+  renderClip: (id: string, style?: string) =>
+    v1request<V1JobOut>(`/api/v1/clips/${id}/render`, {
+      method: 'POST',
+      body: JSON.stringify(style ? { style } : {}),
+    }),
   downloadUrl: (id: string) => `/api/v1/clips/${id}/download`,
+  exportUrl: (id: string) => `/api/v1/exports/${id}/download`,
 
   /** Fetch any single export (preview or final) with Bearer auth. */
   exportBlob: async (exportId: string): Promise<string> => {
@@ -272,6 +315,11 @@ export const v1 = {
     }
     if (!response.ok) throw new V1ApiError(`${response.status} ${response.statusText}`, response.status)
     return URL.createObjectURL(await response.blob())
+  },
+  /** Use a streamable same-origin URL through Tailscale; retain Bearer fallback for localhost. */
+  playableExport: async (exportId: string): Promise<{ url: string; revoke: boolean }> => {
+    if (!getToken()) return { url: `/api/v1/exports/${exportId}/download`, revoke: false }
+    return { url: await v1.exportBlob(exportId), revoke: true }
   },
   /** Fetch the final MP4 with Bearer auth and return an object URL. */
   downloadBlob: async (id: string): Promise<string> => {

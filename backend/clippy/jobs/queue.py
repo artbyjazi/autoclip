@@ -16,9 +16,11 @@ import asyncio
 import contextlib
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 
+from ..config import Settings
 from ..db import store
-from ..db.models import Job
+from ..db.models import Job, new_id
 from ..pipeline.runner import JobCancelled, PipelineRunner
 from .events import Event, broker, progress_event
 
@@ -51,6 +53,7 @@ class JobQueue:
     async def start(self) -> None:
         """Start the worker and requeue anything left running by a crash."""
         self._requeue_interrupted()
+        self._reconcile_auto_previews()
         self._stopping = False
         self._wakeup = asyncio.Event()
         self._task = asyncio.create_task(self._worker(), name="clippy-job-queue")
@@ -80,6 +83,49 @@ class JobQueue:
         for job in interrupted:
             log.info("Requeuing job %s, interrupted by a restart.", job.id)
             store.update_job(job.id, status="queued", error=None)
+
+    def _reconcile_auto_previews(self) -> None:
+        """Ensure completed analyses have their configured preview children.
+
+        This is deliberately idempotent so a restart between child inserts can
+        safely finish the batch without duplicating work.
+        """
+
+        for job in store.list_jobs(limit=500):
+            if job.kind == "analysis" and job.status == "done":
+                self._ensure_auto_previews(job, store.list_clips(job.id))
+
+    def _ensure_auto_previews(self, analysis: Job, clips) -> int:
+        settings = Settings.model_validate(analysis.settings or {})
+        if not settings.clips.auto_preview:
+            return 0
+        source = store.get_source(analysis.source_id)
+        if source is None or not source.path or not Path(source.path).is_file():
+            return 0
+        existing_jobs = store.list_jobs_for_source(analysis.source_id)
+        created = 0
+        for clip in clips:
+            if store.latest_export(clip.id, kind="preview") is not None:
+                continue
+            if any(
+                item.kind == "preview"
+                and item.parent_job_id == analysis.id
+                and item.clip_id == clip.id
+                for item in existing_jobs
+            ):
+                continue
+            store.create_job(
+                Job(
+                    id=new_id(),
+                    source_id=analysis.source_id,
+                    kind="preview",
+                    clip_id=clip.id,
+                    parent_job_id=analysis.id,
+                    settings=analysis.settings,
+                )
+            )
+            created += 1
+        return created
 
     # -- control -----------------------------------------------------------
 
@@ -138,11 +184,13 @@ class JobQueue:
                 runner = PipelineRunner(
                     job,
                     source,
+                    settings=Settings.model_validate(job.settings) if job.settings else None,
                     on_progress=on_progress,
                     is_cancelled=lambda: self.is_cancelled(job.id),
                 )
                 clips = await asyncio.to_thread(_run_blocking, runner)
                 result_count = len(clips)
+                await asyncio.to_thread(self._ensure_auto_previews, job, clips)
             else:
                 from ..pipeline.runner import run_render_job
 

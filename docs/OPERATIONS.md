@@ -46,6 +46,12 @@ Requires `deno` in `/usr/local/bin` plus `remote_components: ["ejs:github"]`
 
 ## API keys and provider secrets
 
+The browser UI authenticates through the identity headers added by Tailscale
+Serve and does not ask for an API key. Set `CLIPPY_TAILSCALE_USERS` to a
+comma-separated login allowlist when the tailnet has more than one permitted
+user. Bearer keys remain the authentication mechanism for n8n and other
+automation clients.
+
 ```bash
 ssh pve 'pct exec 103 -- runuser -u clippy -- env CLIPPY_HOME=/var/lib/clippy \
   /opt/clippy/.venv/bin/clippy api-key create --name NAME'   # value shown once
