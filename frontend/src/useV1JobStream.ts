@@ -18,27 +18,28 @@ interface SseEvent {
 }
 
 /** Minimal SSE parser over a fetch stream (EventSource can't send Bearer). */
-async function* readSse(response: Response): AsyncGenerator<SseEvent> {
+export async function* readSse(response: Response): AsyncGenerator<SseEvent> {
   const reader = response.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let type = ''
   try {
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      buffer += decoder.decode(value, { stream: true })
+      // sse-starlette (and proxies like Tailscale Serve) frame events with
+      // CRLF; normalize so block boundaries are found regardless.
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
       let boundary = buffer.indexOf('\n\n')
       while (boundary >= 0) {
         const block = buffer.slice(0, boundary)
         buffer = buffer.slice(boundary + 2)
+        let type = ''
         let data = ''
         for (const line of block.split('\n')) {
           if (line.startsWith('event:')) type = line.slice(6).trim()
           else if (line.startsWith('data:')) data += line.slice(5).trim()
         }
         if (type) yield { type, data }
-        type = ''
         boundary = buffer.indexOf('\n\n')
       }
     }
@@ -135,8 +136,19 @@ export function useV1JobStream(jobId: string | undefined) {
     }
 
     void run()
+    // Polling fallback: if the SSE connection drops silently (proxy buffering,
+    // missed frames) the DB is still authoritative — sync every few seconds
+    // while the job is non-terminal so the bar never looks frozen.
+    const poller = window.setInterval(() => {
+      void v1.getJob(jobId).then((fresh) => {
+        if (cancelled) return
+        setJob(fresh)
+        if (TERMINAL.has(fresh.status)) window.clearInterval(poller)
+      }).catch(() => undefined)
+    }, 4000)
     return () => {
       cancelled = true
+      window.clearInterval(poller)
       abort.abort()
       abortRef.current = null
     }
