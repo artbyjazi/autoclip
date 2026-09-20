@@ -84,16 +84,6 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
 
-    @app.get("/api/health")
-    async def health() -> dict:
-        status = queue.status()
-        return {
-            "status": "ok",
-            "version": __version__,
-            "running_job": status.running_job_id,
-            "queued": status.queued,
-        }
-
     _mount_frontend(app)
     return app
 

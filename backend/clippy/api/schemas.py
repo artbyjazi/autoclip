@@ -150,7 +150,7 @@ class ExportOut(BaseModel):
             size_bytes=export.size_bytes,
             kind=export.kind,
             created_at=export.created_at,
-            download_url=f"/api/exports/{export.id}/download",
+            download_url=f"/api/v1/exports/{export.id}/download",
         )
 
 
@@ -307,16 +307,3 @@ class ApiKeyOut(BaseModel):
 
 class ApiKeyCreatedOut(ApiKeyOut):
     token: str
-
-
-class SystemOut(BaseModel):
-    ready: bool
-    python_version: str
-    platform: str
-    ffmpeg_version: str | None
-    has_libass: bool
-    nvenc_works: bool
-    accel: str
-    gpu_name: str | None
-    compute_type: str
-    diarization_available: bool

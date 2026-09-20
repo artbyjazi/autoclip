@@ -56,7 +56,7 @@ more effect on output quality than most code changes. Add `highlight_v2.txt` and
 compare on the same source video. No Python required.
 
 **Caption styles.** Add a preset to `PRESETS` in `pipeline/captions.py`. Each is
-a dataclass; the UI picks it up automatically through `/api/caption-styles`.
+a dataclass; the render endpoints validate the key through `get_style`.
 
 **Provider adapters.** Subclass `LLMProvider`, implement `_complete` and
 `health_check`, register it in `providers/__init__.py`. The retry loop, JSON
