@@ -39,6 +39,11 @@ dependencies = [
   "yt-dlp>=2026.1.1",
   # Transcription
   "faster-whisper>=1.1",
+  # Upper bound: faster-whisper calls av.open(metadata_errors=...), which recent
+  # PyAV releases removed (present in 14.x, gone in 19.x). Without the cap a fresh
+  # install resolves to an av that crashes every transcription with
+  # "TypeError: open() got an unexpected keyword argument 'metadata_errors'".
+  "av>=11,<15",
   # Reframe
   "mediapipe>=0.10.14",
   # No [opencv] extra: scenedetect 0.7 dropped it and now depends on
