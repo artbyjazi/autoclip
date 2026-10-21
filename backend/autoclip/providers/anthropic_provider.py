@@ -48,24 +48,20 @@ class AnthropicProvider(LLMProvider):
     async def _complete(self, system: str, user: str, config: DetectionConfig) -> str:
         client = self._client()
         try:
+            # No assistant prefill and no temperature: current Claude models
+            # (Opus 4.6+, Sonnet 4.6+, Opus 5, Sonnet 5) reject both with a 400.
+            # The prompt asks for bare JSON, and extract_json_object strips any
+            # prose or fences the model adds anyway.
             message = await client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                temperature=config.temperature,
                 system=system,
-                messages=[
-                    {"role": "user", "content": user},
-                    # Prefilling the assistant turn with an opening brace is the
-                    # cheapest way to stop Claude prepending a sentence of prose.
-                    {"role": "assistant", "content": "{"},
-                ],
+                messages=[{"role": "user", "content": user}],
             )
         except Exception as exc:
             raise _translate(exc, self.name, self.model) from exc
 
-        text = "".join(block.text for block in message.content if hasattr(block, "text"))
-        # Put back the brace we prefilled.
-        return "{" + text
+        return "".join(block.text for block in message.content if hasattr(block, "text"))
 
     async def health_check(self) -> ProviderStatus:
         if not self.api_key:
