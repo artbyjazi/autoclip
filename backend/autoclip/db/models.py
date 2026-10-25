@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-SourceType = Literal["youtube", "upload"]
+SourceType = Literal["youtube", "twitch", "upload"]
 JobStatus = Literal["queued", "running", "failed", "done", "cancelled"]
 ClipStatus = Literal["candidate", "kept", "discarded", "exported"]
 

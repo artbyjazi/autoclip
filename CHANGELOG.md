@@ -11,6 +11,13 @@ being validated against a fixed golden video set — see
 
 ### Added
 
+- **Twitch links** — paste a Twitch VOD, highlight or clip URL (twitch.tv/videos/…,
+  clips.twitch.tv/…) in the UI, `autoclip clip`, or `POST /api/sources/url`. Live
+  channels are refused; subscriber-only VODs use the same browser-cookies setting
+  as YouTube. Existing databases migrate automatically (schema v2).
+- **Download progress** — pasting a link now shows a live percentage instead of a
+  silent "Fetching…", and submitting the same link twice joins the running
+  download rather than starting a second copy.
 - **Pipeline** — ingest (YouTube via yt-dlp, or file upload), audio preparation,
   transcription with word-level timings, LLM highlight detection, speaker-tracked
   reframing, ASS caption generation, and export at 9:16 / 1:1 / 16:9.

@@ -8,8 +8,12 @@ import {
   type Job,
   type JobSettingsOverrides,
   type ProviderStatus,
+  type Source,
 } from '../api'
 import { ErrorNote } from '../components/ErrorNote'
+
+/** How often to ask the server how a URL download is going. */
+const DOWNLOAD_POLL_MS = 1000
 
 export function Ingest() {
   const navigate = useNavigate()
@@ -21,7 +25,17 @@ export function Ingest() {
   const [overrides, setOverrides] = useState<JobSettingsOverrides>({})
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
+  // null while yt-dlp is still resolving the link and hasn't reported a size.
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   useEffect(() => {
     api.listJobs(8).then(setJobs).catch(() => undefined)
@@ -45,10 +59,28 @@ export function Ingest() {
     [navigate, overrides],
   )
 
+  // Long VODs take a while, so the server downloads in the background and we
+  // poll it. Leaving the page stops polling; the download itself carries on.
+  const downloadUrl = useCallback(async (link: string): Promise<Source> => {
+    setDownloadProgress(null)
+    let download = await api.startDownload(link)
+    while (download.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, DOWNLOAD_POLL_MS))
+      if (!mounted.current) throw new Error('Left the page while downloading.')
+      download = await api.getDownload(download.id)
+      setDownloadProgress(download.progress)
+    }
+    if (download.status === 'failed' || !download.source) {
+      const failure = download.error ?? { message: 'The download failed.', hint: '' }
+      throw new ApiError(failure.message, 422, failure.hint)
+    }
+    return download.source
+  }, [])
+
   const submitUrl = (event: React.FormEvent) => {
     event.preventDefault()
     if (!url.trim()) return
-    void start('url', () => api.ingestYouTube(url.trim()))
+    void start('url', () => downloadUrl(url.trim()))
   }
 
   const submitFile = (file: File) => void start('file', () => api.uploadSource(file))
@@ -79,7 +111,7 @@ export function Ingest() {
               <input
                 id="url"
                 className="field font-display text-xl md:text-2xl"
-                placeholder="https://youtube.com/watch?v=…"
+                placeholder="YouTube or Twitch link — youtube.com/watch?v=… or twitch.tv/videos/…"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 autoComplete="off"
@@ -91,9 +123,14 @@ export function Ingest() {
                 className="btn btn-primary shrink-0"
                 disabled={busy !== null || !url.trim()}
               >
-                {busy === 'url' ? 'Fetching…' : 'Start'}
+                {busy === 'url'
+                  ? downloadProgress === null
+                    ? 'Fetching…'
+                    : `Fetching ${Math.round(downloadProgress * 100)}%`
+                  : 'Start'}
               </button>
             </div>
+            {busy === 'url' && <DownloadProgress progress={downloadProgress} />}
           </form>
 
           <p className="mt-3 text-xs leading-relaxed text-ink-500">
@@ -174,6 +211,33 @@ export function Ingest() {
       )}
 
       <RecentJobs jobs={jobs} />
+    </div>
+  )
+}
+
+function DownloadProgress({ progress }: { progress: number | null }) {
+  const percent = progress === null ? null : Math.round(progress * 100)
+
+  return (
+    <div className="mt-4" role="status" aria-live="polite">
+      <div
+        className="h-px overflow-hidden bg-ink-800"
+        role="progressbar"
+        aria-label="Download progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent ?? undefined}
+      >
+        {/* transform rather than width, so each update composites instead of
+            relaying out the bar. */}
+        <div
+          className="h-px origin-left bg-sodium-500 transition-transform duration-700 ease-out"
+          style={{ transform: `scaleX(${progress ?? 0})` }}
+        />
+      </div>
+      <p className="numeric mt-2 text-xs text-ink-500">
+        {percent === null ? 'Resolving link…' : `Downloading — ${percent}%`}
+      </p>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-"""Ingestion — YouTube URLs and local file uploads become source records.
+"""Ingestion — YouTube and Twitch URLs and local file uploads become source records.
 
 Both paths converge on a validated :class:`~autoclip.db.models.Source` with a
 file on disk and probed metadata.
@@ -16,6 +16,7 @@ import re
 import shutil
 from collections.abc import Callable
 from pathlib import Path
+from typing import Literal
 
 from .. import paths
 from ..config import IngestSettings
@@ -30,6 +31,8 @@ AUDIO_SUFFIXES = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 ACCEPTED_SUFFIXES = VIDEO_SUFFIXES | AUDIO_SUFFIXES
 
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com")
+#: VODs and highlights live on twitch.tv; clips also on clips.twitch.tv.
+_TWITCH_HOSTS = ("twitch.tv", "www.twitch.tv", "m.twitch.tv", "clips.twitch.tv")
 
 #: yt-dlp error fragments that mean "YouTube wants proof you're a human".
 _BOT_CHECK_MARKERS = (
@@ -53,14 +56,43 @@ class IngestError(RuntimeError):
         return f"{base}\n\n{self.hint}" if self.hint else base
 
 
-def is_youtube_url(url: str) -> bool:
+def _hostname(url: str) -> str:
     from urllib.parse import urlparse
 
     try:
-        host = (urlparse(url).hostname or "").lower()
+        return (urlparse(url).hostname or "").lower()
     except ValueError:
-        return False
-    return host in _YOUTUBE_HOSTS
+        return ""
+
+
+def is_youtube_url(url: str) -> bool:
+    return _hostname(url) in _YOUTUBE_HOSTS
+
+
+def is_twitch_url(url: str) -> bool:
+    return _hostname(url) in _TWITCH_HOSTS
+
+
+def is_supported_url(url: str) -> bool:
+    """True for any URL :func:`ingest_url` can download."""
+    return is_youtube_url(url) or is_twitch_url(url)
+
+
+def ingest_url(
+    url: str,
+    settings: IngestSettings | None = None,
+    *,
+    on_progress: Callable[[float], None] | None = None,
+) -> Source:
+    """Download a YouTube or Twitch URL and return a validated source record."""
+    if is_twitch_url(url):
+        return ingest_twitch(url, settings, on_progress=on_progress)
+    if is_youtube_url(url):
+        return ingest_youtube(url, settings, on_progress=on_progress)
+    raise IngestError(
+        "That is not a YouTube or Twitch URL.",
+        hint="Paste a youtube.com, youtu.be, twitch.tv or clips.twitch.tv link, or upload a file.",
+    )
 
 
 def slugify(text: str, *, max_length: int = 60) -> str:
@@ -86,6 +118,39 @@ def ingest_youtube(
     Preconditions:
         url points at content the user owns or has the rights to process.
     """
+    return _ingest_with_ytdlp(url, settings, source_type="youtube", on_progress=on_progress)
+
+
+# --------------------------------------------------------------------------
+# Twitch
+# --------------------------------------------------------------------------
+
+
+def ingest_twitch(
+    url: str,
+    settings: IngestSettings | None = None,
+    *,
+    on_progress: Callable[[float], None] | None = None,
+) -> Source:
+    """Download a Twitch VOD, highlight or clip and return a validated source record.
+
+    Twitch serves HLS with audio and video already muxed, so the configured
+    format's ``best[height<=1080]`` fallback is what matches. Live channels are
+    refused — a stream with no end can't be clipped.
+
+    Preconditions:
+        url points at content the user owns or has the rights to process.
+    """
+    return _ingest_with_ytdlp(url, settings, source_type="twitch", on_progress=on_progress)
+
+
+def _ingest_with_ytdlp(
+    url: str,
+    settings: IngestSettings | None,
+    *,
+    source_type: Literal["youtube", "twitch"],
+    on_progress: Callable[[float], None] | None,
+) -> Source:
     import yt_dlp
 
     settings = settings or IngestSettings()
@@ -100,6 +165,11 @@ def ingest_youtube(
         done = status.get("downloaded_bytes")
         if total and done:
             on_progress(min(1.0, done / total))
+            return
+        # HLS (all of Twitch) often has no byte total, but always counts fragments.
+        index, count = status.get("fragment_index"), status.get("fragment_count")
+        if index and count:
+            on_progress(min(1.0, index / count))
 
     options: dict = {
         "format": settings.ytdlp_format,
@@ -115,16 +185,35 @@ def ingest_youtube(
     if settings.cookies_from_browser:
         # yt-dlp expects a tuple; only the browser name is required.
         options["cookiesfrombrowser"] = (settings.cookies_from_browser,)
-    if settings.prefer_youtube_captions:
+    if source_type == "youtube" and settings.prefer_youtube_captions:
         options["writeautomaticsub"] = True
         options["subtitleslangs"] = ["en.*"]
         options["subtitlesformat"] = "json3"
 
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
-            metadata = ydl.extract_info(url, download=True)
+            if source_type == "twitch":
+                # Resolve first so a live channel is refused before yt-dlp
+                # starts recording a stream that never finishes.
+                resolved = ydl.extract_info(url, download=False)
+                if (resolved or {}).get("is_live"):
+                    raise IngestError(
+                        "This Twitch channel is live right now.",
+                        hint=(
+                            "AutoClip clips finished videos. Wait for the stream to end and "
+                            "paste the VOD link (twitch.tv/videos/…) instead."
+                        ),
+                    )
+                metadata = ydl.process_ie_result(resolved, download=True)
+            else:
+                metadata = ydl.extract_info(url, download=True)
+    except IngestError:
+        shutil.rmtree(target_dir, ignore_errors=True)
+        raise
     except yt_dlp.utils.DownloadError as exc:
         shutil.rmtree(target_dir, ignore_errors=True)
+        if source_type == "twitch":
+            raise _translate_twitch_error(exc, settings) from exc
         raise _translate_ytdlp_error(exc, settings) from exc
     except Exception as exc:
         shutil.rmtree(target_dir, ignore_errors=True)
@@ -139,7 +228,7 @@ def ingest_youtube(
 
     return Source(
         id=source_id,
-        type="youtube",
+        type=source_type,
         url=url,
         path=str(downloaded),
         filename=downloaded.name,
@@ -196,6 +285,42 @@ def _translate_ytdlp_error(exc: Exception, settings: IngestSettings) -> IngestEr
             "`autoclip update-ytdlp` to pull the latest version.\n\n"
             f"Original error: {exc}"
         ),
+    )
+
+
+def _translate_twitch_error(exc: Exception, settings: IngestSettings) -> IngestError:
+    """Turn a yt-dlp failure on a Twitch URL into something the user can act on."""
+    message = str(exc).lower()
+
+    if "not currently live" in message:
+        return IngestError(
+            "That is a Twitch channel link, and the channel isn't live.",
+            hint="Paste a VOD (twitch.tv/videos/…) or clip (clips.twitch.tv/…) link instead.",
+        )
+    if "subscriber" in message or "sub-only" in message or "login" in message:
+        if settings.cookies_from_browser:
+            hint = (
+                f"Cookies are already being read from {settings.cookies_from_browser}. Make "
+                "sure you are signed in to a Twitch account subscribed to this channel, and "
+                "that the browser is fully closed while AutoClip downloads."
+            )
+        else:
+            hint = (
+                "Set a browser to pull cookies from — in Settings, or via config.json's "
+                '`ingest.cookies_from_browser` (e.g. "chrome", "firefox"). You must be '
+                "signed in to Twitch there, and the browser must be closed while AutoClip "
+                "downloads."
+            )
+        return IngestError("This Twitch video is subscriber-only.", hint=hint)
+    if "does not exist" in message or "unavailable" in message or "404" in message:
+        return IngestError(
+            "This Twitch video is unavailable.",
+            hint="Twitch VODs expire after a while, and channels can delete them.",
+        )
+
+    return IngestError(
+        "yt-dlp could not download this Twitch video.",
+        hint=(f"Try `autoclip update-ytdlp` to pull the latest version.\n\nOriginal error: {exc}"),
     )
 
 

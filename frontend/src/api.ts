@@ -177,6 +177,17 @@ export interface JobSettingsOverrides {
 }
 
 /** An API error carrying the server's message and its actionable hint. */
+/** A URL download running on the server; poll it for progress. */
+export interface Download {
+  id: string
+  url: string
+  status: 'running' | 'done' | 'failed'
+  /** 0..1, or null until yt-dlp reports a size. */
+  progress: number | null
+  source: Source | null
+  error: { message: string; hint: string } | null
+}
+
 export class ApiError extends Error {
   hint: string
   status: number
@@ -234,6 +245,20 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ url, cookies_from_browser: cookiesFromBrowser || null }),
     }),
+
+  ingestUrl: (url: string, cookiesFromBrowser?: string) =>
+    request<Source>('/api/sources/url', {
+      method: 'POST',
+      body: JSON.stringify({ url, cookies_from_browser: cookiesFromBrowser || null }),
+    }),
+
+  startDownload: (url: string, cookiesFromBrowser?: string) =>
+    request<Download>('/api/sources/downloads', {
+      method: 'POST',
+      body: JSON.stringify({ url, cookies_from_browser: cookiesFromBrowser || null }),
+    }),
+
+  getDownload: (id: string) => request<Download>(`/api/sources/downloads/${id}`),
 
   uploadSource: (file: File) => {
     const form = new FormData()

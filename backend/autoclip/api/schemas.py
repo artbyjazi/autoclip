@@ -51,9 +51,25 @@ class SourceOut(BaseModel):
         )
 
 
-class YouTubeIngestIn(BaseModel):
+class UrlIngestIn(BaseModel):
     url: str
     cookies_from_browser: str | None = None
+
+
+#: The original YouTube-only endpoint's body; same shape.
+YouTubeIngestIn = UrlIngestIn
+
+
+class DownloadOut(BaseModel):
+    """A URL download in flight, polled by the UI for progress."""
+
+    id: str
+    url: str
+    status: Literal["running", "done", "failed"]
+    #: 0..1, or None until yt-dlp reports a size or fragment count.
+    progress: float | None = None
+    source: SourceOut | None = None
+    error: dict[str, str] | None = None
 
 
 class JobSettingsIn(BaseModel):

@@ -171,6 +171,36 @@ class TestSources:
 
         assert response.status_code == 400
 
+    def test_youtube_endpoint_still_rejects_twitch(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/sources/youtube", json={"url": "https://www.twitch.tv/videos/1"}
+        )
+
+        assert response.status_code == 400
+
+    def test_url_endpoint_rejects_unsupported_hosts(self, client: TestClient) -> None:
+        response = client.post("/api/sources/url", json={"url": "https://vimeo.com/12345"})
+
+        assert response.status_code == 400
+
+    def test_url_endpoint_ingests_twitch(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from autoclip.db.models import new_id
+        from autoclip.pipeline import ingest
+
+        def fake_ingest(url: str, settings: object) -> Source:
+            return Source(id=new_id(), type="twitch", url=url, path="C:/media/vod.mp4", title="VOD")
+
+        monkeypatch.setattr(ingest, "ingest_url", fake_ingest)
+        response = client.post(
+            "/api/sources/url", json={"url": "https://www.twitch.tv/videos/2345678901"}
+        )
+
+        assert response.status_code == 201
+        assert response.json()["type"] == "twitch"
+        assert client.get("/api/sources").json()[0]["title"] == "VOD"
+
     def test_unsupported_upload_type_is_rejected(self, client: TestClient) -> None:
         response = client.post(
             "/api/sources/upload",
@@ -422,3 +452,108 @@ class TestSecretsNeverLeak:
 
         assert "DEADBEEF" not in paths.config_path().read_text(encoding="utf-8")
         assert config.get_secret("anthropic") == "sk-DEADBEEF"
+
+
+class TestBackgroundDownloads:
+    @pytest.fixture(autouse=True)
+    def _fresh_tracker(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from autoclip.api import sources
+
+        monkeypatch.setattr(sources, "_downloads", {})
+
+    def _poll(self, client: TestClient, download_id: str) -> dict:
+        import time
+
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            body = client.get(f"/api/sources/downloads/{download_id}").json()
+            if body["status"] != "running":
+                return body
+            time.sleep(0.02)
+        raise AssertionError("download never finished")
+
+    def test_reports_progress_then_the_source(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import threading
+
+        from autoclip.db.models import new_id
+        from autoclip.pipeline import ingest
+
+        halfway, release = threading.Event(), threading.Event()
+
+        def fake_ingest(url: str, settings: object, *, on_progress) -> Source:
+            on_progress(0.5)
+            halfway.set()
+            release.wait(5)
+            return Source(id=new_id(), type="twitch", url=url, path="C:/m/v.mp4", title="VOD")
+
+        monkeypatch.setattr(ingest, "ingest_url", fake_ingest)
+        started = client.post(
+            "/api/sources/downloads", json={"url": "https://www.twitch.tv/videos/1"}
+        )
+        assert started.status_code == 202
+        download_id = started.json()["id"]
+
+        assert halfway.wait(5)
+        mid = client.get(f"/api/sources/downloads/{download_id}").json()
+        assert mid["status"] == "running"
+        assert mid["progress"] == 0.5
+
+        release.set()
+        done = self._poll(client, download_id)
+        assert done["status"] == "done"
+        assert done["source"]["type"] == "twitch"
+        assert client.get(f"/api/sources/{done['source']['id']}").status_code == 200
+
+    def test_same_url_twice_joins_the_running_download(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import threading
+
+        from autoclip.pipeline import ingest
+
+        release = threading.Event()
+        calls: list[str] = []
+
+        def fake_ingest(url: str, settings: object, *, on_progress) -> Source:
+            calls.append(url)
+            release.wait(5)
+            raise ingest.IngestError("stopped")
+
+        monkeypatch.setattr(ingest, "ingest_url", fake_ingest)
+        body = {"url": "https://www.twitch.tv/videos/2"}
+        first = client.post("/api/sources/downloads", json=body).json()
+        second = client.post("/api/sources/downloads", json=body).json()
+        release.set()
+
+        assert first["id"] == second["id"]
+        assert self._poll(client, first["id"])["status"] == "failed"
+        assert calls == [body["url"]]
+
+    def test_failure_carries_the_hint(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from autoclip.pipeline import ingest
+
+        def fake_ingest(url: str, settings: object, *, on_progress) -> Source:
+            raise ingest.IngestError("This Twitch video is subscriber-only.", hint="cookies")
+
+        monkeypatch.setattr(ingest, "ingest_url", fake_ingest)
+        download_id = client.post(
+            "/api/sources/downloads", json={"url": "https://www.twitch.tv/videos/3"}
+        ).json()["id"]
+
+        failed = self._poll(client, download_id)
+        assert failed["error"] == {
+            "message": "This Twitch video is subscriber-only.",
+            "hint": "cookies",
+        }
+
+    def test_rejects_unsupported_hosts(self, client: TestClient) -> None:
+        response = client.post("/api/sources/downloads", json={"url": "https://vimeo.com/1"})
+
+        assert response.status_code == 400
+
+    def test_unknown_download_is_404(self, client: TestClient) -> None:
+        assert client.get("/api/sources/downloads/nope").status_code == 404

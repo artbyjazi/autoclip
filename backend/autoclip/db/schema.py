@@ -104,9 +104,56 @@ def _migration_v1(conn: sqlite3.Connection) -> None:
     conn.executescript(_V1)
 
 
+#: Adds 'twitch' to sources.type. SQLite can't alter a CHECK constraint, so the
+#: table is rebuilt (sqlite.org/lang_altertable.html, "other kinds of changes").
+_V2 = """
+BEGIN;
+CREATE TABLE sources_new (
+    id          TEXT PRIMARY KEY,
+    type        TEXT NOT NULL CHECK (type IN ('youtube', 'twitch', 'upload')),
+    url         TEXT,
+    filename    TEXT,
+    path        TEXT NOT NULL,
+    title       TEXT NOT NULL DEFAULT '',
+    channel     TEXT,
+    duration_s  REAL NOT NULL DEFAULT 0,
+    width       INTEGER,
+    height      INTEGER,
+    fps         REAL,
+    has_audio   INTEGER NOT NULL DEFAULT 1,
+    has_video   INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL
+);
+INSERT INTO sources_new SELECT * FROM sources;
+DROP TABLE sources;
+ALTER TABLE sources_new RENAME TO sources;
+COMMIT;
+"""
+
+
+def _migration_v2(conn: sqlite3.Connection) -> None:
+    # Foreign keys must be off for the rebuild: with them on, DROP TABLE runs
+    # an implicit DELETE that cascades through every job, clip and export.
+    # The pragma is a no-op inside a transaction, so flush any first.
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript(_V2)
+        violations = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if violations:
+            raise RuntimeError(f"Migration v2 left {len(violations)} foreign key violations.")
+    except Exception:
+        # Roll back here, not in migrate(): re-enabling foreign keys below is
+        # silently ignored while the failed script's transaction is still open.
+        conn.rollback()
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
+
 #: Ordered migrations. Index + 1 is the resulting ``user_version``.
 #: Append only — never edit a migration that has shipped.
-MIGRATIONS: list[Callable[[sqlite3.Connection], None]] = [_migration_v1]
+MIGRATIONS: list[Callable[[sqlite3.Connection], None]] = [_migration_v1, _migration_v2]
 
 SCHEMA_VERSION = len(MIGRATIONS)
 
