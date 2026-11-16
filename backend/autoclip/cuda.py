@@ -34,6 +34,10 @@ _COMPONENTS = ("cuda_runtime", "cublas", "cudnn", "cuda_nvrtc")
 _WINDOWS_SUBDIR = "bin"
 _POSIX_SUBDIR = "lib"
 
+# Keep Windows DLL-directory registrations alive for the lifetime of this process.
+# os.add_dll_directory() returns a handle whose lifetime controls the registration.
+_DLL_DIRECTORY_HANDLES: list[object] = []
+
 
 def _nvidia_root() -> Path | None:
     """Locate the ``nvidia`` package directory inside site-packages."""
@@ -91,7 +95,8 @@ def ensure_cuda_libraries() -> list[Path]:
     for directory in directories:
         try:
             if sys.platform == "win32":
-                os.add_dll_directory(str(directory))
+                handle = os.add_dll_directory(str(directory))
+                _DLL_DIRECTORY_HANDLES.append(handle)
             else:
                 _preload_shared_objects(directory)
             registered.append(directory)
