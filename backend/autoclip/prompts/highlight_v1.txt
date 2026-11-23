@@ -33,11 +33,11 @@ Return nothing rather than padding the list. A transcript section with three goo
 
 ## Titles and hooks
 
-`title` — how a human editor would label this clip in a folder. Specific and concrete, under 60 characters. Not clickbait, not a summary of the topic. "Why most agencies die at 10 clients", not "Discussion about agency growth".
+`title` — how a human editor would label this clip in a folder. Specific and concrete, under 60 characters. Not clickbait, not a summary of the topic. "Why most agencies die at 10 clients", not "Discussion about agency growth". Write `title` in the same language as the transcript (or the requested output language); never translate a non-English transcript's title into English.
 
-`hook` — quote the actual opening words of the clip, verbatim from the transcript. This is used to verify the clip starts where you think it does.
+`hook` — quote the actual opening words of the clip, verbatim from the transcript in its original language. This is used to verify the clip starts where you think it does.
 
-`reason` — one sentence on why this clip works, naming the specific hook and payoff. Written for an editor deciding whether to keep it.
+`reason` — one sentence on why this clip works, naming the specific hook and payoff. Written for an editor deciding whether to keep it, in the same language as `title`.
 
 ## Output
 

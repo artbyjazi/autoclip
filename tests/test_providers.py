@@ -217,3 +217,30 @@ class TestRegistry:
         provider = OpenAIProvider("llama-3.1", base_url="https://openrouter.ai/api/v1")
 
         assert provider.base_url == "https://openrouter.ai/api/v1"
+
+
+class TestPromptLanguage:
+    def test_configured_language_instructs_output_language(self, window: TranscriptWindow) -> None:
+        from autoclip.providers.base import render_window_prompt
+
+        prompt = render_window_prompt(window, DetectionConfig(language="id"))
+
+        assert "Indonesian" in prompt
+        assert "do not translate to English" in prompt
+
+    def test_empty_language_instructs_matching_transcript_language(
+        self, window: TranscriptWindow
+    ) -> None:
+        from autoclip.providers.base import render_window_prompt
+
+        prompt = render_window_prompt(window, DetectionConfig(language=""))
+
+        assert "same language as the transcript" in prompt
+
+    def test_unknown_language_code_is_passed_through(self, window: TranscriptWindow) -> None:
+        from autoclip.providers.base import render_window_prompt
+
+        prompt = render_window_prompt(window, DetectionConfig(language="jv"))
+
+        assert "jv" in prompt
+        assert "same language as the transcript" in prompt

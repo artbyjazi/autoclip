@@ -228,6 +228,49 @@ def load_prompt(version: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+_LANGUAGE_NAMES: dict[str, str] = {
+    "id": "Indonesian",
+    "en": "English",
+    "ms": "Malay",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "pt": "Portuguese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese",
+    "ar": "Arabic",
+    "hi": "Hindi",
+    "ru": "Russian",
+    "nl": "Dutch",
+    "it": "Italian",
+    "tr": "Turkish",
+    "vi": "Vietnamese",
+    "th": "Thai",
+}
+
+
+def _language_instruction(language: str) -> str:
+    code = language.strip().lower()
+    if not code:
+        return (
+            "Write every clip's title and reason in the same language as the transcript, "
+            "and quote hook verbatim from the transcript.\n"
+        )
+    name = _LANGUAGE_NAMES.get(code)
+    if name:
+        return (
+            f"Transcript language: {name} ({code}). Write every clip's title and reason "
+            f"in {name} (do not translate to English), and quote hook verbatim from the "
+            "transcript.\n"
+        )
+    return (
+        f"Transcript language code: {code}. Write every clip's title and reason in "
+        "the same language as the transcript, and quote hook verbatim from the "
+        "transcript.\n"
+    )
+
+
 def render_window_prompt(window: TranscriptWindow, config: DetectionConfig) -> str:
     """Build the user message for one transcript window."""
     speaker_note = ""
@@ -237,10 +280,13 @@ def render_window_prompt(window: TranscriptWindow, config: DetectionConfig) -> s
             f"({', '.join(window.speakers)}); speaker labels are shown inline.\n"
         )
 
+    language_note = _language_instruction(config.language)
+
     return (
         f"Transcript section, words {window.first_word} to {window.last_word}.\n"
         f"Each word is tagged with its index as [index]word.\n"
-        f"{speaker_note}\n"
+        f"{speaker_note}"
+        f"{language_note}\n"
         f"Clip length must be between {config.min_duration_s:.0f} and "
         f"{config.max_duration_s:.0f} seconds.\n"
         f"Return at most {config.max_clips} clips.\n\n"
