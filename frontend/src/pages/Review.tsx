@@ -118,6 +118,11 @@ export function Review() {
     setExporting((current) => new Set(current).add(clip.id))
     setError(null)
     try {
+      // Auto-save edited caption words so users don't accidentally export stale text.
+      if (clip.id === selectedId && wordsDirty) {
+        patchClip(await api.patchCaptions(clip.id, { words }))
+        setWordsDirty(false)
+      }
       await api.exportClip(clip.id, clip.ratio, clip.caption_style)
       patchClip(await api.getClip(clip.id))
     } catch (err) {
