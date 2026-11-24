@@ -414,3 +414,29 @@ def _frame_signature(video: Path, timestamp: float) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def test_output_filename_prefixes_rank_so_repeated_titles_survive() -> None:
+    """Two clips with the same title must not collide on disk.
+
+    A local model will happily give several passages the same title. Before the
+    rank prefix, the second export overwrote the first and the run reported more
+    clips than it had actually written.
+    """
+    first = export.output_filename("Counter-Strike players in Valorant", "9:16", rank=2)
+    second = export.output_filename("Counter-Strike players in Valorant", "9:16", rank=5)
+
+    assert first != second
+    assert first == "02-counter-strike-players-in-valorant_9x16.mp4"
+    assert second == "05-counter-strike-players-in-valorant_9x16.mp4"
+
+
+def test_output_filename_is_stable_for_the_same_rank() -> None:
+    """Re-exporting one clip overwrites its own file instead of adding a copy."""
+    again = export.output_filename("Counter-Strike players in Valorant", "9:16", rank=2)
+    assert again == "02-counter-strike-players-in-valorant_9x16.mp4"
+
+
+def test_output_filename_without_rank_keeps_the_bare_slug() -> None:
+    """Callers that have no rank still get the original name."""
+    assert export.output_filename("Clean lower third", "1:1") == "clean-lower-third_1x1.mp4"

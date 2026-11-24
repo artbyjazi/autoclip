@@ -75,8 +75,18 @@ def slugify_title(title: str, *, max_length: int = 50) -> str:
     return slug[:max_length] or "clip"
 
 
-def output_filename(title: str, ratio: str) -> str:
-    return f"{slugify_title(title)}_{ratio.replace(':', 'x')}.mp4"
+def output_filename(title: str, ratio: str, *, rank: int | None = None) -> str:
+    """Filename for an exported clip.
+
+    ``rank`` is prefixed whenever the caller knows it. Two clips in one job can
+    carry the same title — local models repeat themselves on similar passages —
+    and the slug alone makes the later export overwrite the earlier one with no
+    warning, so the job reports more clips than exist on disk. The rank is
+    unique within a job and stable across re-exports, which keeps a re-render of
+    the same clip pointing at its own file instead of piling up copies.
+    """
+    prefix = f"{rank:02d}-" if rank is not None else ""
+    return f"{prefix}{slugify_title(title)}_{ratio.replace(':', 'x')}.mp4"
 
 
 # --------------------------------------------------------------------------

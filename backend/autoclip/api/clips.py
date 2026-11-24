@@ -199,7 +199,9 @@ async def export_clip(clip_id: str, payload: ExportRequestIn) -> ExportOut:
     destination = (
         paths.exports_dir()
         / clip.job_id
-        / export_module.output_filename(clip.title or f"clip-{clip.rank}", payload.ratio)
+        / export_module.output_filename(
+            clip.title or f"clip-{clip.rank}", payload.ratio, rank=clip.rank
+        )
     )
 
     request = export_module.ExportRequest(
