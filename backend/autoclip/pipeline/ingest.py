@@ -112,6 +112,10 @@ def ingest_youtube(
         "retries": 3,
         "fragment_retries": 3,
     }
+    # YouTube's n-challenge needs a JS runtime; yt-dlp only enables deno by default.
+    js_runtimes = {name: {} for name in ("deno", "node", "bun") if shutil.which(name)}
+    if js_runtimes:
+        options["js_runtimes"] = js_runtimes
     if settings.cookies_from_browser:
         # yt-dlp expects a tuple; only the browser name is required.
         options["cookiesfrombrowser"] = (settings.cookies_from_browser,)
