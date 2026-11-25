@@ -368,7 +368,7 @@ class PipelineRunner:
             crop_path = crop_paths.get(clip.id) or self._fallback_crop_path(clip, ratio)
             words = transcript.slice(clip.start_word, clip.end_word)
             destination = destination_dir / export.output_filename(
-                clip.title or f"clip-{clip.rank}", ratio
+                clip.title or f"clip-{clip.rank}", ratio, rank=clip.rank
             )
 
             request = export.ExportRequest(
